@@ -2,8 +2,7 @@ name: Deploy to VPS
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -25,48 +24,28 @@ jobs:
       BRANCH: ${{ github.ref_name }}
 
     steps:
-      - name: Checkout
+      - name: Checkout (sanity)
         uses: actions/checkout@v4
 
       - name: Setup SSH
-        env:
-          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
         run: |
           set -euo pipefail
-          : "${VPS_HOST:=51.210.244.46}"
-          : "${VPS_PORT:=2222}"
-
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          
-          if [ -z "$SSH_KEY" ]; then
-            echo "::error::Le secret VPS_SSH_KEY n'est pas configure dans les Secrets GitHub du depot."
-            exit 1
-          fi
-
-          if echo "$SSH_KEY" | base64 -d >/dev/null 2>&1; then
-            echo "$SSH_KEY" | base64 -d > ~/.ssh/id_ed25519
-          else
-            printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
-          fi
-          
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -p "$VPS_PORT" -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -p "${VPS_PORT:-2222}" -H "${VPS_HOST:-51.210.244.46}" >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Deploy on VPS
         run: |
           set -euo pipefail
-          : "${VPS_HOST:=51.210.244.46}"
-          : "${VPS_PORT:=2222}"
-          : "${VPS_USER:=debian}"
           : "${APP_DIR:=/home/debian/apps/gashooter}"
           : "${COMPOSE_PROJECT:=gashooter}"
 
-          ssh -i ~/.ssh/id_ed25519 -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" \
+          ssh -p "${VPS_PORT:-2222}" "$VPS_USER@$VPS_HOST" \
             "APP_DIR='$APP_DIR' REPO_URL='$REPO_URL' BRANCH='$BRANCH' COMPOSE_PROJECT='$COMPOSE_PROJECT' bash -s" <<'REMOTE'
           set -euo pipefail
 
-          echo "==> Verification du dossier de l'application"
           if [ ! -d "$APP_DIR/.git" ]; then
             mkdir -p "$APP_DIR"
             git clone "$REPO_URL" "$APP_DIR"
@@ -78,14 +57,8 @@ jobs:
           git reset --hard "origin/$BRANCH"
           git clean -fd -e .env
 
-          echo "==> Verification du fichier .env"
           if [ ! -f .env ]; then
-            echo "Initialisation du fichier .env..."
-            JWT_SECRET=$(openssl rand -hex 32 2>/dev/null || cat /proc/sys/kernel/random/uuid | tr -d '-')
-            DB_ROOT_PASSWORD=$(openssl rand -hex 16 2>/dev/null || echo "root_$(date +%s)")
-            DB_PASSWORD=$(openssl rand -hex 16 2>/dev/null || echo "pass_$(date +%s)")
-
-            cat <<EOF > .env
+            cat <<'EOF' > .env
 PORT=5000
 NODE_ENV=production
 APP_URL=https://gashooter.azim404.com
@@ -93,11 +66,11 @@ CORS_ORIGIN=https://gashooter.azim404.com
 
 DB_HOST=db
 DB_USER=gashooter_user
-DB_PASSWORD=$DB_PASSWORD
+DB_PASSWORD=gashooter_secret_pass
 DB_NAME=gashooter_db
-DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD
+DB_ROOT_PASSWORD=gashooter_root_pass
 
-JWT_SECRET=$JWT_SECRET
+JWT_SECRET=gashooter_jwt_secret_change_me
 JWT_EXPIRES_IN=7d
 
 BREVO_API_KEY=
@@ -109,42 +82,26 @@ EOF
             chmod 600 .env
           fi
 
-          echo "==> Build et demarrage des conteneurs"
           docker compose -p "$COMPOSE_PROJECT" pull db || true
           docker compose -p "$COMPOSE_PROJECT" up -d --build --remove-orphans
+          docker image prune -f >/dev/null 2>&1 || true
 
-          echo "==> Attente de la disponibilite du service"
-          for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:3012/api/health >/dev/null 2>&1 || curl -fsS http://127.0.0.1:3012/ >/dev/null 2>&1; then
-              echo "Service operationnel sur 127.0.0.1:3012"
-              break
-            fi
-            sleep 1
-          done
-
-          echo "==> Configuration du reverse proxy Nginx hote"
           if [ -f deploy/nginx/gashooter.azim404.com.conf ]; then
             sudo -n install -m 0644 deploy/nginx/gashooter.azim404.com.conf /etc/nginx/sites-available/gashooter.azim404.com
             sudo -n ln -sfn /etc/nginx/sites-available/gashooter.azim404.com /etc/nginx/sites-enabled/gashooter.azim404.com.conf
-            sudo -n nginx -t
-            sudo -n systemctl reload nginx
+            sudo -n nginx -t && sudo -n systemctl reload nginx
           fi
 
-          echo "==> Certbot TLS"
           if command -v certbot >/dev/null 2>&1; then
             sudo -n certbot --nginx -d gashooter.azim404.com --non-interactive --agree-tos --register-unsafely-without-email --keep-until-expiring >/dev/null 2>&1 || true
             sudo -n systemctl reload nginx || true
           fi
 
-          echo "==> Conteneurs en cours d'execution"
+          echo "---- ps ----"
           docker compose -p "$COMPOSE_PROJECT" ps
-
-          echo "==> Nettoyage images obsoletes"
-          docker image prune -f >/dev/null 2>&1 || true
           REMOTE
 
-      - name: Smoke test
+      - name: Smoke test (local on runner)
         run: |
           set +e
-          echo "Verification de l'endpoint public..."
-          curl -skI --max-time 10 https://gashooter.azim404.com | head -n 5 || true
+          curl -skI --max-time 10 https://gashooter.azim404.com | head -n 1 || true
