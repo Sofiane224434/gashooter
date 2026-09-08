@@ -10,8 +10,26 @@ const PORT = process.env.PORT || 5000;
 // Connexion BDD
 testConnection();
 // Middlewares
-app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
+const allowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3012',
+    process.env.APP_URL,
+    process.env.CORS_ORIGIN
+].filter(Boolean);
+
+app.use(cors({
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+            return callback(null, true);
+        }
+        return callback(null, true);
+    },
+    credentials: true
+}));
 app.use(express.json());
+
 // Logger (dev)
 if (process.env.NODE_ENV !== 'production') {
     app.use((req, res, next) => {
@@ -19,10 +37,17 @@ if (process.env.NODE_ENV !== 'production') {
         next();
     });
 }
-// Routes
-app.get('/', (req, res) => {
-    res.json({ message: 'Starter Kit API (ES Modules)', status: 'online' });
+
+// Health check routes
+app.get(['/', '/api/health', '/api/site-state'], (req, res) => {
+    res.json({
+        status: 'online',
+        service: 'gashooter-api',
+        timestamp: new Date().toISOString()
+    });
 });
+
+// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/email', emailRoutes);
 // 404

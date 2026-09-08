@@ -1,0 +1,68 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: gashooter-db
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootsecret}
+      MYSQL_DATABASE: ${DB_NAME:-starter_kit}
+      MYSQL_USER: ${DB_USER:-starter_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-starter_pass}
+    volumes:
+      - dbdata:/var/lib/mysql
+      - ./backend/schema.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    networks:
+      - gashooter-network
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: gashooter-api
+    restart: unless-stopped
+    environment:
+      PORT: 5000
+      NODE_ENV: production
+      DB_HOST: db
+      DB_USER: ${DB_USER:-starter_user}
+      DB_PASSWORD: ${DB_PASSWORD:-starter_pass}
+      DB_NAME: ${DB_NAME:-starter_kit}
+      JWT_SECRET: ${JWT_SECRET:-gashooter_default_secret_key_change_me}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
+      BREVO_SENDER_EMAIL: ${BREVO_SENDER_EMAIL:-}
+      BREVO_SENDER_NAME: ${BREVO_SENDER_NAME:-Gashooter}
+      DEEPL_API_KEY: ${DEEPL_API_KEY:-}
+      APP_URL: ${APP_URL:-https://gashooter.azim404.com}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://gashooter.azim404.com}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - gashooter-network
+
+  app:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: gashooter-app
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3012:80"
+    depends_on:
+      - api
+    networks:
+      - gashooter-network
+
+volumes:
+  dbdata:
+
+networks:
+  gashooter-network:
+    driver: bridge
