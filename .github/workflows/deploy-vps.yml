@@ -15,11 +15,11 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      VPS_HOST: ${{ secrets.VPS_HOST || '51.210.244.46' }}
-      VPS_PORT: ${{ secrets.VPS_PORT || '2222' }}
-      VPS_USER: ${{ secrets.VPS_USER || 'debian' }}
-      APP_DIR: ${{ vars.VPS_APP_DIR || '/home/debian/apps/gashooter' }}
-      COMPOSE_PROJECT: ${{ vars.VPS_COMPOSE_PROJECT || 'gashooter' }}
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_PORT: ${{ secrets.VPS_PORT }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      APP_DIR: ${{ vars.VPS_APP_DIR }}
+      COMPOSE_PROJECT: ${{ vars.VPS_COMPOSE_PROJECT }}
       REPO_URL: https://github.com/${{ github.repository }}.git
       BRANCH: ${{ github.ref_name }}
 
@@ -30,10 +30,13 @@ jobs:
       - name: Setup SSH
         run: |
           set -euo pipefail
+          : "${VPS_HOST:=51.210.244.46}"
+          : "${VPS_PORT:=2222}"
+
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           
-          # Supporte clé brute ou encodée en base64
+          # Supporte cle brute ou base64
           if echo "${{ secrets.VPS_SSH_KEY }}" | base64 -d >/dev/null 2>&1; then
             echo "${{ secrets.VPS_SSH_KEY }}" | base64 -d > ~/.ssh/id_ed25519
           else
@@ -41,13 +44,18 @@ jobs:
           fi
           
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -p "${VPS_PORT:-2222}" -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -p "$VPS_PORT" -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Deploy on VPS
         run: |
           set -euo pipefail
+          : "${VPS_HOST:=51.210.244.46}"
+          : "${VPS_PORT:=2222}"
+          : "${VPS_USER:=debian}"
+          : "${APP_DIR:=/home/debian/apps/gashooter}"
+          : "${COMPOSE_PROJECT:=gashooter}"
 
-          ssh -i ~/.ssh/id_ed25519 -p "${VPS_PORT:-2222}" "$VPS_USER@$VPS_HOST" \
+          ssh -i ~/.ssh/id_ed25519 -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" \
             "APP_DIR='$APP_DIR' REPO_URL='$REPO_URL' BRANCH='$BRANCH' COMPOSE_PROJECT='$COMPOSE_PROJECT' bash -s" <<'REMOTE'
           set -euo pipefail
 
