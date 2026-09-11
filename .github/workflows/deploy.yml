@@ -5,60 +5,48 @@ on:
     branches: [main]
   workflow_dispatch:
 
-concurrency:
-  group: deploy-vps-gashooter
-  cancel-in-progress: false
-
 jobs:
   deploy:
-    name: SSH deploy + docker compose
     runs-on: ubuntu-latest
 
-    env:
-      VPS_HOST: ${{ secrets.VPS_HOST }}
-      VPS_PORT: ${{ secrets.VPS_PORT }}
-      VPS_USER: ${{ secrets.VPS_USER }}
-      APP_DIR: ${{ vars.VPS_APP_DIR }}
-      COMPOSE_PROJECT: ${{ vars.VPS_COMPOSE_PROJECT }}
-      REPO_URL: https://github.com/${{ github.repository }}.git
-      BRANCH: ${{ github.ref_name }}
-
     steps:
-      - name: Checkout (sanity)
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup SSH
-        run: |
-          set -euo pipefail
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -p "${VPS_PORT:-2222}" -H "${VPS_HOST:-51.210.244.46}" >> ~/.ssh/known_hosts 2>/dev/null
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 2222
+          script: |
+            set -e
 
-      - name: Deploy on VPS
-        run: |
-          set -euo pipefail
-          : "${APP_DIR:=/home/debian/apps/gashooter}"
-          : "${COMPOSE_PROJECT:=gashooter}"
+            APP_DIR=~/apps/gashooter
+            REPO_URL=https://github.com/${{ github.repository }}.git
+            COMPOSE_PROJECT=gashooter
 
-          ssh -p "${VPS_PORT:-2222}" "$VPS_USER@$VPS_HOST" \
-            "APP_DIR='$APP_DIR' REPO_URL='$REPO_URL' BRANCH='$BRANCH' COMPOSE_PROJECT='$COMPOSE_PROJECT' bash -s" <<'REMOTE'
-          set -euo pipefail
+            mkdir -p $APP_DIR
+            cd $APP_DIR
 
-          if [ ! -d "$APP_DIR/.git" ]; then
-            mkdir -p "$APP_DIR"
-            git clone "$REPO_URL" "$APP_DIR"
-          fi
+            if [ -d ".git" ]; then
+              git remote set-url origin $REPO_URL
+              git fetch origin main
+              git reset --hard origin/main
+              git clean -fd -e .env
+            else
+              git clone $REPO_URL $APP_DIR
+              cd $APP_DIR
+            fi
 
-          cd "$APP_DIR"
-          git remote set-url origin "$REPO_URL"
-          git fetch --all --prune
-          git reset --hard "origin/$BRANCH"
-          git clean -fd -e .env
+            # Initialisation .env si inexistant
+            if [ ! -f .env ]; then
+              JWT_SECRET=$(openssl rand -hex 32 2>/dev/null || date +%s)
+              DB_ROOT_PASSWORD=$(openssl rand -hex 16 2>/dev/null || echo "root_secret")
+              DB_PASSWORD=$(openssl rand -hex 16 2>/dev/null || echo "gashooter_pass")
 
-          if [ ! -f .env ]; then
-            cat <<'EOF' > .env
+              cat <<EOF > .env
 PORT=5000
 NODE_ENV=production
 APP_URL=https://gashooter.azim404.com
@@ -66,11 +54,11 @@ CORS_ORIGIN=https://gashooter.azim404.com
 
 DB_HOST=db
 DB_USER=gashooter_user
-DB_PASSWORD=gashooter_secret_pass
+DB_PASSWORD=$DB_PASSWORD
 DB_NAME=gashooter_db
-DB_ROOT_PASSWORD=gashooter_root_pass
+DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD
 
-JWT_SECRET=gashooter_jwt_secret_change_me
+JWT_SECRET=$JWT_SECRET
 JWT_EXPIRES_IN=7d
 
 BREVO_API_KEY=
@@ -79,29 +67,20 @@ BREVO_SENDER_NAME=Gashooter
 
 DEEPL_API_KEY=
 EOF
-            chmod 600 .env
-          fi
+              chmod 600 .env
+            fi
 
-          docker compose -p "$COMPOSE_PROJECT" pull db || true
-          docker compose -p "$COMPOSE_PROJECT" up -d --build --remove-orphans
-          docker image prune -f >/dev/null 2>&1 || true
+            echo "==> Build et demarrage des conteneurs"
+            COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT docker compose pull db || true
+            COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT docker compose up -d --build --remove-orphans
+            docker image prune -f
 
-          if [ -f deploy/nginx/gashooter.azim404.com.conf ]; then
-            sudo -n install -m 0644 deploy/nginx/gashooter.azim404.com.conf /etc/nginx/sites-available/gashooter.azim404.com
-            sudo -n ln -sfn /etc/nginx/sites-available/gashooter.azim404.com /etc/nginx/sites-enabled/gashooter.azim404.com.conf
-            sudo -n nginx -t && sudo -n systemctl reload nginx
-          fi
+            echo "==> Configuration Nginx et rechargement"
+            if [ -f deploy/nginx/gashooter.azim404.com.conf ]; then
+              sudo install -m 0644 deploy/nginx/gashooter.azim404.com.conf /etc/nginx/sites-available/gashooter.azim404.com
+              sudo ln -sfn /etc/nginx/sites-available/gashooter.azim404.com /etc/nginx/sites-enabled/gashooter.azim404.com.conf
+              sudo nginx -t && sudo systemctl reload nginx
+            fi
 
-          if command -v certbot >/dev/null 2>&1; then
-            sudo -n certbot --nginx -d gashooter.azim404.com --non-interactive --agree-tos --register-unsafely-without-email --keep-until-expiring >/dev/null 2>&1 || true
-            sudo -n systemctl reload nginx || true
-          fi
-
-          echo "---- ps ----"
-          docker compose -p "$COMPOSE_PROJECT" ps
-          REMOTE
-
-      - name: Smoke test (local on runner)
-        run: |
-          set +e
-          curl -skI --max-time 10 https://gashooter.azim404.com | head -n 1 || true
+            echo "==> Verification des conteneurs"
+            COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT docker compose ps
