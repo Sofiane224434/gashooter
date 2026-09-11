@@ -2,9 +2,8 @@ import { useState } from 'react';
 import { sound } from '../../services/sound.js';
 
 export default function SettingsModal({ isOpen, onClose, crtEnabled, onToggleCrt }) {
-    const [volume, setVolume] = useState(40);
+    const [volume, setVolume] = useState(30);
     const [muted, setMuted] = useState(false);
-    const [bgmActive, setBgmActive] = useState(false);
 
     if (!isOpen) return null;
 
@@ -18,11 +17,6 @@ export default function SettingsModal({ isOpen, onClose, crtEnabled, onToggleCrt
         const next = !muted;
         setMuted(next);
         sound.setMuted(next);
-    };
-
-    const toggleBgm = () => {
-        const active = sound.toggleBgm();
-        setBgmActive(active);
     };
 
     return (
@@ -52,13 +46,13 @@ export default function SettingsModal({ isOpen, onClose, crtEnabled, onToggleCrt
                     {/* Audio section */}
                     <div className="bg-slate-900/60 border border-white/10 rounded-xl p-4">
                         <h3 className="text-sm font-mono text-emerald-300 font-bold uppercase mb-4">
-                            🔊 Audio & Synthétiseur Rétro
+                            🔊 Bruitages & Effets Sonores (SFX)
                         </h3>
                         
                         <div className="space-y-4">
                             <div>
                                 <div className="flex justify-between text-xs font-mono text-gray-300 mb-2">
-                                    <span>VOLUME GLOBAL DES BRUITAGES</span>
+                                    <span>VOLUME DES EFFETS SONORES</span>
                                     <span className="text-emerald-400 font-bold">{volume}%</span>
                                 </div>
                                 <input
@@ -71,7 +65,7 @@ export default function SettingsModal({ isOpen, onClose, crtEnabled, onToggleCrt
                                 />
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-3 pt-2">
+                            <div className="flex items-center gap-3 pt-2">
                                 <button
                                     onClick={toggleMute}
                                     onMouseEnter={() => sound.playHover()}
@@ -81,20 +75,11 @@ export default function SettingsModal({ isOpen, onClose, crtEnabled, onToggleCrt
                                             : 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
                                     }`}
                                 >
-                                    {muted ? '🔇 AUDIO COUPÉ' : '🔊 AUDIO ACTIF'}
+                                    {muted ? '🔇 EFFETS SONORES COUPÉS' : '🔊 EFFETS SONORES ACTIFS'}
                                 </button>
-
-                                <button
-                                    onClick={toggleBgm}
-                                    onMouseEnter={() => sound.playHover()}
-                                    className={`px-4 py-2 rounded-lg font-mono text-xs font-bold border transition-all cursor-pointer ${
-                                        bgmActive
-                                            ? 'bg-purple-500/30 border-purple-400 text-purple-200 animate-pulse'
-                                            : 'bg-slate-800 border-white/20 text-gray-300 hover:text-white'
-                                    }`}
-                                >
-                                    {bgmActive ? '🎵 SYNTH-WAVE : ACTIF' : '🎵 SYNTH-WAVE : EN PAUSE'}
-                                </button>
+                                <span className="text-xs font-mono text-gray-400">
+                                    (Aucune musique de fond active)
+                                </span>
                             </div>
                         </div>
                     </div>
