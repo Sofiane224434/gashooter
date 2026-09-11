@@ -1,16 +1,22 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 
 export default function FirstPersonMap({ onExit }) {
     const mountRef = useRef(null);
+    const onExitRef = useRef(onExit);
+    onExitRef.current = onExit;
+
     const [isLocked, setIsLocked] = useState(false);
     const [targetsHit, setTargetsHit] = useState(0);
-    const [totalTargets, setTotalTargets] = useState(0);
+    const totalTargets = 8;
 
     useEffect(() => {
         const container = mountRef.current;
         if (!container) return;
+
+        // Nettoyage préalable au cas où
+        container.innerHTML = '';
 
         // 1. Scene & Camera & Renderer
         const scene = new THREE.Scene();
@@ -25,7 +31,7 @@ export default function FirstPersonMap({ onExit }) {
         );
         camera.position.set(0, 1.7, 10); // Hauteur des yeux
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.shadowMap.enabled = true;
@@ -33,23 +39,17 @@ export default function FirstPersonMap({ onExit }) {
         container.appendChild(renderer.domElement);
 
         // 2. Lights
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.45);
         scene.add(ambientLight);
 
         const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
         dirLight.position.set(30, 50, 20);
         dirLight.castShadow = true;
-        dirLight.shadow.mapSize.width = 2048;
-        dirLight.shadow.mapSize.height = 2048;
-        dirLight.shadow.camera.near = 0.5;
-        dirLight.shadow.camera.far = 150;
-        dirLight.shadow.camera.left = -50;
-        dirLight.shadow.camera.right = 50;
-        dirLight.shadow.camera.top = 50;
-        dirLight.shadow.camera.bottom = -50;
+        dirLight.shadow.mapSize.width = 1024;
+        dirLight.shadow.mapSize.height = 1024;
         scene.add(dirLight);
 
-        // Lumière colorée d'ambiance
+        // Lumières colorées d'ambiance
         const pointLight1 = new THREE.PointLight(0x00f0ff, 2, 40);
         pointLight1.position.set(-15, 6, -15);
         scene.add(pointLight1);
@@ -84,37 +84,26 @@ export default function FirstPersonMap({ onExit }) {
         const wallGeoH = new THREE.BoxGeometry(100, 6, 1);
         const wallNorth = new THREE.Mesh(wallGeoH, wallMat);
         wallNorth.position.set(0, 3, -50);
-        wallNorth.castShadow = true;
         wallNorth.receiveShadow = true;
         scene.add(wallNorth);
 
         const wallSouth = new THREE.Mesh(wallGeoH, wallMat);
         wallSouth.position.set(0, 3, 50);
-        wallSouth.castShadow = true;
         wallSouth.receiveShadow = true;
         scene.add(wallSouth);
 
         const wallGeoV = new THREE.BoxGeometry(1, 6, 100);
         const wallWest = new THREE.Mesh(wallGeoV, wallMat);
         wallWest.position.set(-50, 3, 0);
-        wallWest.castShadow = true;
         wallWest.receiveShadow = true;
         scene.add(wallWest);
 
         const wallEast = new THREE.Mesh(wallGeoV, wallMat);
         wallEast.position.set(50, 3, 0);
-        wallEast.castShadow = true;
         wallEast.receiveShadow = true;
         scene.add(wallEast);
 
         // 5. Blocs, Piliers & Obstacles
-        const obstacleMat = new THREE.MeshStandardMaterial({
-            color: 0x334155,
-            roughness: 0.6,
-            metalness: 0.4
-        });
-        const obstacles = [];
-
         const addBox = (x, y, z, w, h, d, color = 0x334155) => {
             const geo = new THREE.BoxGeometry(w, h, d);
             const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.4 });
@@ -123,7 +112,6 @@ export default function FirstPersonMap({ onExit }) {
             mesh.castShadow = true;
             mesh.receiveShadow = true;
             scene.add(mesh);
-            obstacles.push(mesh);
             return mesh;
         };
 
@@ -158,10 +146,8 @@ export default function FirstPersonMap({ onExit }) {
             [0, 3.5, 20]
         ];
 
-        setTotalTargets(targetPositions.length);
-
         targetPositions.forEach((pos) => {
-            const targetGeo = new THREE.SphereGeometry(0.8, 24, 24);
+            const targetGeo = new THREE.SphereGeometry(0.8, 20, 20);
             const targetMat = new THREE.MeshStandardMaterial({
                 color: 0xef4444,
                 emissive: 0x7f1d1d,
@@ -238,7 +224,7 @@ export default function FirstPersonMap({ onExit }) {
                     break;
                 case 'Escape':
                     if (!controls.isLocked) {
-                        onExit();
+                        onExitRef.current();
                     }
                     break;
                 default:
@@ -296,7 +282,6 @@ export default function FirstPersonMap({ onExit }) {
             if (intersects.length > 0) {
                 const hitTarget = intersects[0].object;
                 if (hitTarget.userData.isTarget) {
-                    // Cible touchée : flash blanc puis disparition / respawn
                     hitTarget.material.color.setHex(0xffffff);
                     hitTarget.material.emissive.setHex(0x10b981);
                     setTargetsHit((prev) => prev + 1);
@@ -316,7 +301,6 @@ export default function FirstPersonMap({ onExit }) {
             const laserMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
             const laserMesh = new THREE.Mesh(laserGeo, laserMat);
 
-            // Part de l'arme
             const startPos = new THREE.Vector3(0.22, -0.19, -0.7);
             startPos.applyMatrix4(camera.matrixWorld);
             laserMesh.position.copy(startPos);
@@ -367,10 +351,9 @@ export default function FirstPersonMap({ onExit }) {
             }
 
             if (controls.isLocked) {
-                // Frottements
                 velocity.x -= velocity.x * 10.0 * delta;
                 velocity.z -= velocity.z * 10.0 * delta;
-                velocity.y -= 22.0 * delta; // Gravité
+                velocity.y -= 22.0 * delta;
 
                 direction.z = Number(moveState.forward) - Number(moveState.backward);
                 direction.x = Number(moveState.right) - Number(moveState.left);
@@ -410,17 +393,25 @@ export default function FirstPersonMap({ onExit }) {
             window.removeEventListener('keyup', onKeyUp);
             window.removeEventListener('mousedown', fireLaser);
             cancelAnimationFrame(animId);
-            if (container && renderer.domElement) {
+            controls.dispose();
+            renderer.dispose();
+            if (container && renderer.domElement && container.contains(renderer.domElement)) {
                 container.removeChild(renderer.domElement);
             }
-            renderer.dispose();
         };
-    }, [onExit]);
+    }, []); // Hook monté une seule fois sans re-création inutile
+
+    const requestLock = useCallback(() => {
+        const canvas = mountRef.current?.querySelector('canvas');
+        if (canvas) {
+            canvas.requestPointerLock();
+        }
+    }, []);
 
     return (
         <div className="relative w-full h-screen overflow-hidden bg-black select-none font-sans">
             {/* 3D Canvas Mount */}
-            <div ref={mountRef} className="w-full h-full cursor-crosshair" />
+            <div ref={mountRef} onClick={requestLock} className="w-full h-full cursor-crosshair" />
 
             {/* Réticule de visée (Crosshair) */}
             {isLocked && (
@@ -441,7 +432,7 @@ export default function FirstPersonMap({ onExit }) {
                     MAP TEST 3D : <strong className="text-emerald-400">ZONE ALPHA</strong>
                 </div>
                 <div className="px-3 py-1.5 bg-slate-900/80 border border-zinc-700 rounded-lg backdrop-blur-sm">
-                    CIBLES TOUCHÉES : <strong className="text-emerald-400">{targetsHit}</strong>
+                    CIBLES TOUCHÉES : <strong className="text-emerald-400">{targetsHit}</strong> / {totalTargets}
                 </div>
             </div>
 
@@ -457,7 +448,7 @@ export default function FirstPersonMap({ onExit }) {
 
             {/* Overlay Initial / Pause lorsque la souris n'est pas verrouillée */}
             {!isLocked && (
-                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm text-white">
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm text-white pointer-events-auto">
                     <div className="max-w-md w-full mx-4 p-8 bg-zinc-900/95 border border-zinc-700 rounded-2xl shadow-2xl text-center">
                         <h2 className="text-2xl font-bold uppercase tracking-wider mb-2 text-white">
                             Map Test Première Personne
@@ -494,10 +485,7 @@ export default function FirstPersonMap({ onExit }) {
                         </div>
 
                         <button
-                            onClick={() => {
-                                const canvas = mountRef.current?.querySelector('canvas');
-                                if (canvas) canvas.requestPointerLock();
-                            }}
+                            onClick={requestLock}
                             className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold uppercase tracking-wider rounded-xl transition text-sm cursor-pointer shadow-lg shadow-emerald-500/20"
                         >
                             ▶ Cliquer pour Jouer
