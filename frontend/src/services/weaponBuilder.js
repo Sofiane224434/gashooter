@@ -5,12 +5,21 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 export class WeaponBuilder {
     static gltfLoader = new GLTFLoader();
 
+    static createPlaceholder() {
+        const group = new THREE.Group();
+        const mat = new THREE.MeshStandardMaterial({ color: 0x27272a, metalness: 0.8, roughness: 0.3 });
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.5), mat);
+        mesh.position.set(0.24, -0.22, -0.45);
+        group.add(mesh);
+        return group;
+    }
+
     /**
      * Charge un fichier 3D GLB et le normalise pour la vue première personne
      */
     static loadGLBWeapon(url, options = {}) {
         const weaponContainer = new THREE.Group();
-        const placeholder = this.createAssaultRifle();
+        const placeholder = this.createPlaceholder();
         weaponContainer.add(placeholder);
 
         this.gltfLoader.load(
@@ -68,7 +77,7 @@ export class WeaponBuilder {
             },
             undefined,
             (error) => {
-                console.warn(`[WeaponBuilder] Erreur chargement GLB (${url}), utilisation du modèle de secours:`, error);
+                console.warn(`[WeaponBuilder] Erreur chargement GLB (${url}):`, error);
             }
         );
 
