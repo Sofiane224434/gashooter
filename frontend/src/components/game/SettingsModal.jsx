@@ -1,140 +1,88 @@
-import { useState } from 'react';
-import { sound } from '../../services/sound.js';
-
-export default function SettingsModal({ isOpen, onClose, crtEnabled, onToggleCrt }) {
-    const [volume, setVolume] = useState(30);
-    const [muted, setMuted] = useState(false);
-
+export default function SettingsModal({ isOpen, onClose }) {
     if (!isOpen) return null;
 
-    const handleVolumeChange = (e) => {
-        const val = Number(e.target.value);
-        setVolume(val);
-        sound.setVolume(val / 100);
-    };
-
-    const toggleMute = () => {
-        const next = !muted;
-        setMuted(next);
-        sound.setMuted(next);
+    const toggleFullscreen = () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(() => {});
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-            <div className="relative w-full max-w-2xl bg-slate-950/95 border-2 border-emerald-500/60 rounded-2xl p-6 sm:p-8 shadow-[0_0_50px_rgba(16,185,129,0.3)] text-white">
-                {/* Header */}
-                <div className="flex items-center justify-between border-b border-emerald-500/30 pb-4 mb-6">
-                    <div className="flex items-center gap-3">
-                        <span className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></span>
-                        <h2 className="text-2xl sm:text-3xl font-black tracking-wider text-emerald-400 font-mono">
-                            // CONFIGURATION SYSTÈME
-                        </h2>
-                    </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
+            <div className="w-full max-w-lg bg-zinc-900 border border-zinc-700 rounded-xl p-6 sm:p-8 text-zinc-100 shadow-2xl">
+                {/* En-tête */}
+                <div className="flex items-center justify-between border-b border-zinc-800 pb-4 mb-6">
+                    <h2 className="text-xl sm:text-2xl font-bold tracking-wide uppercase">
+                        Options
+                    </h2>
                     <button
-                        onClick={() => {
-                            sound.playBack();
-                            onClose();
-                        }}
-                        onMouseEnter={() => sound.playHover()}
-                        className="px-3 py-1 bg-red-500/20 hover:bg-red-500/40 text-red-400 border border-red-500/50 rounded-lg text-sm font-mono transition-all cursor-pointer"
+                        onClick={onClose}
+                        className="text-zinc-400 hover:text-white text-sm font-semibold px-2 py-1 rounded transition"
                     >
-                        FERMER [ESC]
+                        ✕ Fermer
                     </button>
                 </div>
 
-                <div className="space-y-6">
-                    {/* Audio section */}
-                    <div className="bg-slate-900/60 border border-white/10 rounded-xl p-4">
-                        <h3 className="text-sm font-mono text-emerald-300 font-bold uppercase mb-4">
-                            🔊 Bruitages & Effets Sonores (SFX)
-                        </h3>
-                        
-                        <div className="space-y-4">
-                            <div>
-                                <div className="flex justify-between text-xs font-mono text-gray-300 mb-2">
-                                    <span>VOLUME DES EFFETS SONORES</span>
-                                    <span className="text-emerald-400 font-bold">{volume}%</span>
-                                </div>
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="100"
-                                    value={volume}
-                                    onChange={handleVolumeChange}
-                                    className="w-full accent-emerald-400 cursor-pointer"
-                                />
-                            </div>
+                {/* Contenu */}
+                <div className="space-y-5 text-sm">
+                    <div className="flex items-center justify-between py-2 border-b border-zinc-800/60">
+                        <div>
+                            <div className="font-semibold text-zinc-200">Mode Plein Écran</div>
+                            <div className="text-xs text-zinc-400">Basculer l'affichage en plein écran</div>
+                        </div>
+                        <button
+                            onClick={toggleFullscreen}
+                            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 rounded text-xs font-semibold uppercase tracking-wider transition"
+                        >
+                            Basculer
+                        </button>
+                    </div>
 
-                            <div className="flex items-center gap-3 pt-2">
-                                <button
-                                    onClick={toggleMute}
-                                    onMouseEnter={() => sound.playHover()}
-                                    className={`px-4 py-2 rounded-lg font-mono text-xs font-bold border transition-all cursor-pointer ${
-                                        muted
-                                            ? 'bg-red-500/20 border-red-400 text-red-300'
-                                            : 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
-                                    }`}
-                                >
-                                    {muted ? '🔇 EFFETS SONORES COUPÉS' : '🔊 EFFETS SONORES ACTIFS'}
-                                </button>
-                                <span className="text-xs font-mono text-gray-400">
-                                    (Aucune musique de fond active)
-                                </span>
+                    <div className="flex items-center justify-between py-2 border-b border-zinc-800/60">
+                        <div>
+                            <div className="font-semibold text-zinc-200">Langue</div>
+                            <div className="text-xs text-zinc-400">Langue de l'interface</div>
+                        </div>
+                        <span className="text-xs font-semibold px-3 py-1.5 bg-zinc-800 rounded border border-zinc-700">
+                            Français (FR)
+                        </span>
+                    </div>
+
+                    <div className="py-2">
+                        <div className="font-semibold text-zinc-200 mb-2">Contrôles clavier</div>
+                        <div className="grid grid-cols-2 gap-2 text-xs text-zinc-400">
+                            <div className="bg-zinc-800/60 p-2.5 rounded border border-zinc-800 flex justify-between">
+                                <span>Déplacement :</span>
+                                <strong className="text-zinc-200">Z, Q, S, D / Flèches</strong>
+                            </div>
+                            <div className="bg-zinc-800/60 p-2.5 rounded border border-zinc-800 flex justify-between">
+                                <span>Action / Tir :</span>
+                                <strong className="text-zinc-200">Espace</strong>
+                            </div>
+                            <div className="bg-zinc-800/60 p-2.5 rounded border border-zinc-800 flex justify-between">
+                                <span>Menu / Pause :</span>
+                                <strong className="text-zinc-200">Échap</strong>
+                            </div>
+                            <div className="bg-zinc-800/60 p-2.5 rounded border border-zinc-800 flex justify-between">
+                                <span>Valider :</span>
+                                <strong className="text-zinc-200">Entrée</strong>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    {/* Affichage & Effets */}
-                    <div className="bg-slate-900/60 border border-white/10 rounded-xl p-4">
-                        <h3 className="text-sm font-mono text-emerald-300 font-bold uppercase mb-3">
-                            🖥️ Graphismes & Affichage Rétro
-                        </h3>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <div className="text-sm font-bold font-mono">Filtre Écran CRT / Scanlines</div>
-                                <div className="text-xs text-gray-400">Ajoute les lignes de balayage et le grain des bornes d'arcade</div>
-                            </div>
-                            <button
-                                onClick={() => {
-                                    sound.playSelect();
-                                    onToggleCrt();
-                                }}
-                                onMouseEnter={() => sound.playHover()}
-                                className={`px-4 py-2 rounded-lg font-mono text-xs font-bold border transition-all cursor-pointer ${
-                                    crtEnabled
-                                        ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
-                                        : 'bg-slate-800 border-white/20 text-gray-400'
-                                }`}
-                            >
-                                {crtEnabled ? 'ACTIVÉ' : 'DÉSACTIVÉ'}
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Contrôles */}
-                    <div className="bg-slate-900/60 border border-white/10 rounded-xl p-4">
-                        <h3 className="text-sm font-mono text-emerald-300 font-bold uppercase mb-3">
-                            🎮 Configuration des Touches
-                        </h3>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-xs text-center">
-                            <div className="p-2 bg-slate-950 rounded border border-white/10">
-                                <span className="text-emerald-400 block font-bold text-sm">Z / ↑</span>
-                                <span className="text-gray-400">Avancer</span>
-                            </div>
-                            <div className="p-2 bg-slate-950 rounded border border-white/10">
-                                <span className="text-emerald-400 block font-bold text-sm">Q / S / D</span>
-                                <span className="text-gray-400">Esquive</span>
-                            </div>
-                            <div className="p-2 bg-slate-950 rounded border border-white/10">
-                                <span className="text-emerald-400 block font-bold text-sm">ESPACE</span>
-                                <span className="text-gray-400">Tir Principal</span>
-                            </div>
-                            <div className="p-2 bg-slate-950 rounded border border-white/10">
-                                <span className="text-emerald-400 block font-bold text-sm">SHIFT</span>
-                                <span className="text-gray-400">Bombe à Gaz</span>
-                            </div>
-                        </div>
-                    </div>
+                {/* Bouton bas */}
+                <div className="mt-8 text-right">
+                    <button
+                        onClick={onClose}
+                        className="px-5 py-2 bg-zinc-100 hover:bg-white text-zinc-900 font-semibold rounded text-sm transition"
+                    >
+                        Retour au menu
+                    </button>
                 </div>
             </div>
         </div>

@@ -1,52 +1,45 @@
-import { sound } from '../../services/sound.js';
-
 export default function CreditsModal({ isOpen, onClose }) {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-            <div className="relative w-full max-w-xl bg-slate-950/95 border-2 border-purple-500/60 rounded-2xl p-6 sm:p-8 shadow-[0_0_50px_rgba(168,85,247,0.3)] text-white text-center">
-                {/* Header */}
-                <div className="flex items-center justify-between border-b border-purple-500/30 pb-4 mb-6">
-                    <div className="flex items-center gap-3">
-                        <span className="w-3 h-3 rounded-full bg-purple-400 animate-pulse"></span>
-                        <h2 className="text-2xl font-black tracking-wider text-purple-400 font-mono">
-                            // CRÉDITS & ÉQUIPE
-                        </h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
+            <div className="w-full max-w-md bg-zinc-900 border border-zinc-700 rounded-xl p-6 sm:p-8 text-zinc-100 shadow-2xl text-center">
+                <h2 className="text-xl sm:text-2xl font-bold uppercase tracking-wider mb-6">
+                    Crédits
+                </h2>
+
+                <div className="space-y-4 text-sm text-zinc-300">
+                    <div>
+                        <div className="text-xs text-zinc-500 uppercase tracking-widest font-semibold mb-1">
+                            Développement & Conception
+                        </div>
+                        <div className="font-bold text-base text-white">Sofiane Kherarfa</div>
                     </div>
+
+                    <div>
+                        <div className="text-xs text-zinc-500 uppercase tracking-widest font-semibold mb-1">
+                            Projet & Infrastructure
+                        </div>
+                        <div className="font-semibold text-zinc-200">Gashooter • AZIM404</div>
+                    </div>
+
+                    <div>
+                        <div className="text-xs text-zinc-500 uppercase tracking-widest font-semibold mb-1">
+                            Technologies
+                        </div>
+                        <div className="text-xs text-zinc-400">
+                            React, Vite, Node.js, Docker, Nginx
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mt-8">
                     <button
-                        onClick={() => {
-                            sound.playBack();
-                            onClose();
-                        }}
-                        onMouseEnter={() => sound.playHover()}
-                        className="px-3 py-1 bg-red-500/20 hover:bg-red-500/40 text-red-400 border border-red-500/50 rounded-lg text-sm font-mono transition-all cursor-pointer"
+                        onClick={onClose}
+                        className="px-6 py-2 bg-zinc-100 hover:bg-white text-zinc-900 font-semibold rounded text-sm transition"
                     >
-                        FERMER [ESC]
+                        Fermer
                     </button>
-                </div>
-
-                <div className="space-y-4 font-mono text-sm">
-                    <div className="p-4 bg-slate-900/80 rounded-xl border border-white/10">
-                        <div className="text-xs text-purple-300 font-bold uppercase mb-1">CONCEPTION & DÉVELOPPEMENT</div>
-                        <div className="text-lg font-black text-white">Sofiane Kherarfa</div>
-                        <div className="text-xs text-gray-400">Architecture Fullstack & Game Design</div>
-                    </div>
-
-                    <div className="p-4 bg-slate-900/80 rounded-xl border border-white/10">
-                        <div className="text-xs text-cyan-300 font-bold uppercase mb-1">PLATEFORME & PRODUCTION</div>
-                        <div className="text-lg font-black text-white">AZIM404</div>
-                        <div className="text-xs text-gray-400">Infrastructure Cloud, Reverse Proxy & Sécurité HTTPS</div>
-                    </div>
-
-                    <div className="p-4 bg-slate-900/80 rounded-xl border border-white/10">
-                        <div className="text-xs text-emerald-300 font-bold uppercase mb-1">MOTEUR AUDIO & GRAPHIQUE</div>
-                        <div className="text-base font-bold text-white">Web Audio Synth & HTML5 Canvas Parallax</div>
-                    </div>
-                </div>
-
-                <div className="mt-6 text-xs font-mono text-gray-400">
-                    © 2026 GASHOOTER • Tous droits réservés.
                 </div>
             </div>
         </div>
