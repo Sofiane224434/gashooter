@@ -21,11 +21,11 @@ export default function FirstPersonMap({ onExit }) {
     const totalTargets = 10;
 
     const weaponsList = [
-        { id: 'rifle', name: "FUSIL D'ASSAUT TACTIQUE", type: 'Automatique', icon: '🔫', rpm: '600 RPM', damage: 'Moyen' },
-        { id: 'sniper', name: 'FUSIL DE PRÉCISION AWM', type: 'Coup par coup', icon: '🎯', rpm: '45 RPM', damage: 'Ultra Élevé' },
-        { id: 'shotgun', name: 'FUSIL À POMPE LOURD', type: 'Dispersion', icon: '💥', rpm: '90 RPM', damage: 'Dévastateur (Court)' },
-        { id: 'pistol', name: 'PISTOLET TACTIQUE', type: 'Semi-Auto', icon: '🗡️', rpm: '350 RPM', damage: 'Équilibré' },
-        { id: 'plasma', name: 'LANCE-PLASMA LOURD', type: 'Énergie', icon: '⚡', rpm: '120 RPM', damage: 'Zone' }
+        { id: 'rifle', name: "FUSIL D'ASSAUT M4 (Modèle 3D GLB)", type: 'Automatique', icon: '🔫', rpm: '650 RPM', damage: 'Moyen' },
+        { id: 'sniper', name: 'FUSIL TACTIQUE SNIPER (Modèle 3D GLB)', type: 'Précision', icon: '🎯', rpm: '60 RPM', damage: 'Ultra Élevé' },
+        { id: 'heavy_gun', name: 'CANON LOURD MULTI-TUBES (Modèle 3D GLB)', type: 'Lourd', icon: '💥', rpm: '400 RPM', damage: 'Dévastateur' },
+        { id: 'pistol', name: 'PISTOLET TACTIQUE 9MM (Modèle 3D GLB)', type: 'Semi-Auto', icon: '🗡️', rpm: '350 RPM', damage: 'Équilibré' },
+        { id: 'sword', name: 'LAME DE COMBAT TACTIQUE (Modèle 3D GLB)', type: 'Mêlée / Assaut', icon: '⚔️', rpm: 'Attaque Rapide', damage: 'Tranchant' }
     ];
 
     useEffect(() => {
@@ -272,13 +272,26 @@ export default function FirstPersonMap({ onExit }) {
             targetDrones.push(droneGroup);
         });
 
-        // 7. ARSENAL DE 5 ARMES 3D RÉALISTES
+        // Tourelles 3D défensives interactives sur la carte
+        WeaponBuilder.loadTurret((turret1) => {
+            turret1.position.set(5, 0, 8);
+            scene.add(turret1);
+            registerCollider(turret1);
+        });
+        WeaponBuilder.loadTurret((turret2) => {
+            turret2.position.set(-10, 0, -14);
+            turret2.rotation.y = Math.PI / 4;
+            scene.add(turret2);
+            registerCollider(turret2);
+        });
+
+        // 7. ARSENAL DE 5 ARMES 3D RÉELLES (.GLB)
         const weaponModels = [
-            WeaponBuilder.createAssaultRifle(), // 0: Rifle
-            WeaponBuilder.createSniperRifle(),  // 1: Sniper
-            WeaponBuilder.createShotgun(),      // 2: Shotgun
-            WeaponBuilder.createPistol(),       // 3: Pistol
-            WeaponBuilder.createPlasmaCannon()  // 4: Plasma
+            WeaponBuilder.createAssaultRifle(), // 0: M4 Assault Rifle GLB
+            WeaponBuilder.createSniperRifle(),  // 1: Aim Rifle Sniper GLB
+            WeaponBuilder.createHeavyGun(),     // 2: Heavy Machine Gun GLB
+            WeaponBuilder.createPistol(),       // 3: Tactical Pistol GLB
+            WeaponBuilder.createSword()         // 4: Combat Sword Blade GLB
         ];
 
         const weaponHolder = new THREE.Group();
