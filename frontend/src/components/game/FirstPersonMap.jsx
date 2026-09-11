@@ -14,7 +14,6 @@ export default function FirstPersonMap({ onExit }) {
 
     const [isLocked, setIsLocked] = useState(false);
     const [targetsHit, setTargetsHit] = useState(0);
-    const [ammo, setAmmo] = useState(30);
     const totalTargets = 8;
 
     useEffect(() => {
@@ -23,8 +22,8 @@ export default function FirstPersonMap({ onExit }) {
 
         // 1. Scene, Camera & Renderer
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x060810);
-        scene.fog = new THREE.FogExp2(0x060810, 0.012);
+        scene.background = new THREE.Color(0x111827); // Ciel plus clair et visible
+        scene.fog = new THREE.FogExp2(0x0f172a, 0.008); // Brouillard léger sans assombrir
 
         const camera = new THREE.PerspectiveCamera(
             75,
@@ -32,7 +31,7 @@ export default function FirstPersonMap({ onExit }) {
             0.1,
             1000
         );
-        camera.position.set(0, 1.7, 12);
+        camera.position.set(0, 1.7, 14);
 
         const renderer = new THREE.WebGLRenderer({
             canvas: canvas,
@@ -44,51 +43,65 @@ export default function FirstPersonMap({ onExit }) {
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.15;
+        renderer.toneMappingExposure = 1.45; // Luminosité vive et contrastée
         renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-        // 2. Post-Processing (Bloom pour lueurs néon & Tone Mapping HDR)
+        // 2. Post-Processing (Bloom pour lueurs & OutputPass)
         const composer = new EffectComposer(renderer);
         const renderPass = new RenderPass(scene, camera);
         composer.addPass(renderPass);
 
         const bloomPass = new UnrealBloomPass(
             new THREE.Vector2(window.innerWidth, window.innerHeight),
-            0.75, // Force de la lueur (Bloom Strength)
-            0.4,  // Rayon (Radius)
-            0.7   // Seuil de déclenchement (Threshold)
+            0.6, // Force équilibrée
+            0.4,
+            0.75
         );
         composer.addPass(bloomPass);
 
         const outputPass = new OutputPass();
         composer.addPass(outputPass);
 
-        // 3. Éclairages Dynamiques Réalistes
-        const ambientLight = new THREE.AmbientLight(0x0f172a, 1.5);
+        // 3. Éclairages Puissants & Lumineux
+        // Lumière ambiante claire
+        const ambientLight = new THREE.AmbientLight(0xffffff, 2.5);
         scene.add(ambientLight);
 
-        const sunLight = new THREE.DirectionalLight(0xe0f2fe, 2.0);
-        sunLight.position.set(30, 45, 25);
+        // Soleil principal
+        const sunLight = new THREE.DirectionalLight(0xf8fafc, 3.2);
+        sunLight.position.set(35, 50, 25);
         sunLight.castShadow = true;
         sunLight.shadow.mapSize.width = 2048;
         sunLight.shadow.mapSize.height = 2048;
         sunLight.shadow.camera.near = 1;
-        sunLight.shadow.camera.far = 120;
-        sunLight.shadow.bias = -0.0005;
+        sunLight.shadow.camera.far = 140;
+        sunLight.shadow.bias = -0.0004;
         scene.add(sunLight);
 
-        // Spots néon dynamiques dans la station
-        const spot1 = new THREE.PointLight(0x10b981, 4, 35, 1.8);
-        spot1.position.set(-15, 6, -15);
-        scene.add(spot1);
+        // Lumière de débouchage opposée (Fill Light)
+        const fillLight = new THREE.DirectionalLight(0x93c5fd, 1.6);
+        fillLight.position.set(-35, 40, -25);
+        scene.add(fillLight);
 
-        const spot2 = new THREE.PointLight(0x00f0ff, 4, 35, 1.8);
-        spot2.position.set(15, 6, 15);
-        scene.add(spot2);
+        // Projecteurs de plafond de la station (Hangar Floodlights)
+        const addFloodlight = (x, z, color = 0xffffff) => {
+            const light = new THREE.PointLight(color, 4.5, 45, 1.2);
+            light.position.set(x, 10, z);
+            scene.add(light);
 
-        const spotCenter = new THREE.PointLight(0xa855f7, 3, 30, 1.5);
-        spotCenter.position.set(0, 7, -25);
-        scene.add(spotCenter);
+            // Lampe visible
+            const bulbGeo = new THREE.SphereGeometry(0.3, 16, 16);
+            const bulbMat = new THREE.MeshBasicMaterial({ color });
+            const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+            bulb.position.set(x, 10, z);
+            scene.add(bulb);
+        };
+
+        addFloodlight(-20, -20, 0x38bdf8);
+        addFloodlight(20, -20, 0x10b981);
+        addFloodlight(-20, 20, 0x10b981);
+        addFloodlight(20, 20, 0x38bdf8);
+        addFloodlight(0, 10, -25, 0xc084fc);
 
         // 4. Matériaux PBR Seamless
         const floorPbrMat = PBRTextureGenerator.createSciFiFloorMaterial(30, 30);
@@ -102,31 +115,41 @@ export default function FirstPersonMap({ onExit }) {
         floor.receiveShadow = true;
         scene.add(floor);
 
-        // 6. Murs d'enceinte PBR
-        const wallGeoH = new THREE.BoxGeometry(100, 7, 1);
+        // 6. Système de Boîtes de Collision (AABB)
+        const colliders = [];
+
+        // Murs d'enceinte PBR
+        const wallGeoH = new THREE.BoxGeometry(100, 8, 2);
         const wallNorth = new THREE.Mesh(wallGeoH, wallPbrMat);
-        wallNorth.position.set(0, 3.5, -50);
+        wallNorth.position.set(0, 4, -50);
+        wallNorth.castShadow = true;
         wallNorth.receiveShadow = true;
         scene.add(wallNorth);
+        colliders.push(new THREE.Box3().setFromObject(wallNorth));
 
         const wallSouth = new THREE.Mesh(wallGeoH, wallPbrMat);
-        wallSouth.position.set(0, 3.5, 50);
+        wallSouth.position.set(0, 4, 50);
+        wallSouth.castShadow = true;
         wallSouth.receiveShadow = true;
         scene.add(wallSouth);
+        colliders.push(new THREE.Box3().setFromObject(wallSouth));
 
-        const wallGeoV = new THREE.BoxGeometry(1, 7, 100);
+        const wallGeoV = new THREE.BoxGeometry(2, 8, 100);
         const wallWest = new THREE.Mesh(wallGeoV, wallPbrMat);
-        wallWest.position.set(-50, 3.5, 0);
+        wallWest.position.set(-50, 4, 0);
+        wallWest.castShadow = true;
         wallWest.receiveShadow = true;
         scene.add(wallWest);
+        colliders.push(new THREE.Box3().setFromObject(wallWest));
 
         const wallEast = new THREE.Mesh(wallGeoV, wallPbrMat);
-        wallEast.position.set(50, 3.5, 0);
+        wallEast.position.set(50, 4, 0);
+        wallEast.castShadow = true;
         wallEast.receiveShadow = true;
         scene.add(wallEast);
+        colliders.push(new THREE.Box3().setFromObject(wallEast));
 
-        // 7. Blocs & Caisses
-        const obstacles = [];
+        // 7. Caisses & Obstacles avec Collisions
         const addCrate = (x, y, z, size = 2) => {
             const geo = new THREE.BoxGeometry(size, size, size);
             const mesh = new THREE.Mesh(geo, cratePbrMat);
@@ -134,36 +157,37 @@ export default function FirstPersonMap({ onExit }) {
             mesh.castShadow = true;
             mesh.receiveShadow = true;
             scene.add(mesh);
-            obstacles.push(mesh);
+            colliders.push(new THREE.Box3().setFromObject(mesh));
             return mesh;
         };
 
-        // Empilements de caisses
         addCrate(6, 0, -4, 2.2);
         addCrate(6, 2.2, -4, 1.8);
-        addCrate(8.2, 0, -4, 2);
+        addCrate(8.4, 0, -4, 2);
         addCrate(-8, 0, 5, 2.5);
         addCrate(-8, 2.5, 5, 1.8);
         addCrate(15, 0, 2, 2.2);
         addCrate(-15, 0, -2, 2.2);
 
-        // Piliers avec anneaux lumineux
+        // Piliers avec Collisions
         const addPillar = (x, z) => {
-            const pillarGeo = new THREE.CylinderGeometry(1.2, 1.2, 8, 24);
-            const pillarMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4, metalness: 0.8 });
+            const pillarGeo = new THREE.CylinderGeometry(1.4, 1.4, 10, 24);
+            const pillarMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4, metalness: 0.8 });
             const pillar = new THREE.Mesh(pillarGeo, pillarMat);
-            pillar.position.set(x, 4, z);
+            pillar.position.set(x, 5, z);
             pillar.castShadow = true;
             pillar.receiveShadow = true;
             scene.add(pillar);
 
             // Anneau néon
-            const ringGeo = new THREE.TorusGeometry(1.3, 0.08, 16, 32);
+            const ringGeo = new THREE.TorusGeometry(1.5, 0.09, 16, 32);
             const ringMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
             const ring = new THREE.Mesh(ringGeo, ringMat);
             ring.rotation.x = Math.PI / 2;
-            ring.position.set(x, 4.5, z);
+            ring.position.set(x, 5, z);
             scene.add(ring);
+
+            colliders.push(new THREE.Box3().setFromObject(pillar));
         };
 
         addPillar(-12, -12);
@@ -172,14 +196,16 @@ export default function FirstPersonMap({ onExit }) {
         addPillar(12, 12);
 
         // Plateforme d'observation
-        const platGeo = new THREE.BoxGeometry(18, 2, 14);
-        const platMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4, metalness: 0.7 });
+        const platGeo = new THREE.BoxGeometry(20, 2, 14);
+        const platMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4, metalness: 0.7 });
         const platform = new THREE.Mesh(platGeo, platMat);
         platform.position.set(0, 1, -28);
+        platform.castShadow = true;
         platform.receiveShadow = true;
         scene.add(platform);
+        colliders.push(new THREE.Box3().setFromObject(platform));
 
-        // 8. Cibles Drones 3D avec Plasma Core & Anneaux Rotatifs
+        // 8. Cibles Drones 3D
         const targetDrones = [];
         const dronePositions = [
             [-12, 4.5, -12],
@@ -196,13 +222,11 @@ export default function FirstPersonMap({ onExit }) {
             const droneGroup = new THREE.Group();
             droneGroup.position.set(pos[0], pos[1], pos[2]);
 
-            // Cœur de plasma émissif
             const coreGeo = new THREE.SphereGeometry(0.55, 24, 24);
             const coreMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
             const core = new THREE.Mesh(coreGeo, coreMat);
             droneGroup.add(core);
 
-            // Anneau extérieur rotatif
             const ringGeo = new THREE.TorusGeometry(0.9, 0.06, 16, 32);
             const ringMat = new THREE.MeshStandardMaterial({
                 color: 0x38bdf8,
@@ -219,25 +243,21 @@ export default function FirstPersonMap({ onExit }) {
                 core,
                 ring,
                 initialY: pos[1],
-                offset: Math.random() * Math.PI * 2,
-                health: 1
+                offset: Math.random() * Math.PI * 2
             };
 
             scene.add(droneGroup);
             targetDrones.push(droneGroup);
         });
 
-        // 9. Modèle Arme Sci-Fi détaillée attachée à la caméra
+        // 9. Arme FPS Sci-Fi
         const weaponGroup = new THREE.Group();
-
-        // Corps principal
         const bodyGeo = new THREE.BoxGeometry(0.14, 0.18, 0.55);
         const bodyMat = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.3, metalness: 0.85 });
         const gunBody = new THREE.Mesh(bodyGeo, bodyMat);
         gunBody.position.set(0.24, -0.22, -0.45);
         weaponGroup.add(gunBody);
 
-        // Canon laser
         const barrelGeo = new THREE.CylinderGeometry(0.025, 0.03, 0.45, 16);
         barrelGeo.rotateX(Math.PI / 2);
         const barrelMat = new THREE.MeshStandardMaterial({ color: 0x09090b, roughness: 0.2, metalness: 0.95 });
@@ -245,7 +265,6 @@ export default function FirstPersonMap({ onExit }) {
         gunBarrel.position.set(0.24, -0.19, -0.72);
         weaponGroup.add(gunBarrel);
 
-        // Bandeau néon d'énergie sur l'arme
         const stripGeo = new THREE.BoxGeometry(0.02, 0.03, 0.35);
         const stripMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
         const energyStrip = new THREE.Mesh(stripGeo, stripMat);
@@ -255,19 +274,19 @@ export default function FirstPersonMap({ onExit }) {
         camera.add(weaponGroup);
         scene.add(camera);
 
-        // 10. Système de Particules d'Étincelles (Impact Sparks)
+        // 10. Particules d'Étincelles (Sparks)
         const sparks = [];
         const sparkGeo = new THREE.SphereGeometry(0.04, 8, 8);
         const sparkMat = new THREE.MeshBasicMaterial({ color: 0x34d399 });
 
         const createSparks = (pos) => {
-            for (let i = 0; i < 12; i++) {
+            for (let i = 0; i < 14; i++) {
                 const spark = new THREE.Mesh(sparkGeo, sparkMat);
                 spark.position.copy(pos);
                 const velocity = new THREE.Vector3(
-                    (Math.random() - 0.5) * 8,
-                    Math.random() * 6 + 2,
-                    (Math.random() - 0.5) * 8
+                    (Math.random() - 0.5) * 9,
+                    Math.random() * 7 + 2,
+                    (Math.random() - 0.5) * 9
                 );
                 scene.add(spark);
                 sparks.push({ mesh: spark, vel: velocity, life: 1.0 });
@@ -311,7 +330,7 @@ export default function FirstPersonMap({ onExit }) {
                     moveState.sprint = true;
                     break;
                 case 'Space':
-                    if (canJump && camera.position.y <= 1.75) {
+                    if (canJump) {
                         velocity.y = 8.5;
                         canJump = false;
                     }
@@ -356,14 +375,13 @@ export default function FirstPersonMap({ onExit }) {
         window.addEventListener('keydown', onKeyDown);
         window.addEventListener('keyup', onKeyUp);
 
-        // 12. Tirs Laser & Détection
+        // 12. Tirs Blaster
         const raycaster = new THREE.Raycaster();
         const lasers = [];
 
         const fireLaser = () => {
             if (!controls.isLocked) return;
 
-            // Recul de l'arme
             weaponGroup.position.z += 0.12;
             weaponGroup.rotation.x += 0.08;
             setTimeout(() => {
@@ -371,7 +389,6 @@ export default function FirstPersonMap({ onExit }) {
                 weaponGroup.rotation.x = 0;
             }, 70);
 
-            // Raycast
             raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
             const intersects = raycaster.intersectObjects(scene.children, true);
 
@@ -379,7 +396,6 @@ export default function FirstPersonMap({ onExit }) {
                 const hit = intersects[0];
                 createSparks(hit.point);
 
-                // Trouver si on a touché un drone
                 let obj = hit.object;
                 while (obj.parent && !obj.userData?.isTarget && obj.parent !== scene) {
                     obj = obj.parent;
@@ -397,7 +413,6 @@ export default function FirstPersonMap({ onExit }) {
                 }
             }
 
-            // Faisceau laser émissif
             const laserGeo = new THREE.CylinderGeometry(0.03, 0.03, 1.6, 8);
             laserGeo.rotateX(Math.PI / 2);
             const laserMat = new THREE.MeshBasicMaterial({ color: 0x34d399 });
@@ -428,10 +443,52 @@ export default function FirstPersonMap({ onExit }) {
         };
         window.addEventListener('resize', handleResize);
 
-        // 14. Boucle de Rendu & Animations
+        // 14. Moteur Physique & Détection des Collisions
         let prevTime = performance.now();
         let animId;
         let walkCycle = 0;
+        const playerRadius = 0.55;
+
+        // Fonction de vérification de collision avec le joueur
+        const checkCollision = (posX, posZ, currentY) => {
+            const playerBox = new THREE.Box3(
+                new THREE.Vector3(posX - playerRadius, currentY - 1.6, posZ - playerRadius),
+                new THREE.Vector3(posX + playerRadius, currentY + 0.2, posZ + playerRadius)
+            );
+
+            for (let i = 0; i < colliders.length; i++) {
+                const box = colliders[i];
+                // Si le joueur est en dessous du sommet de l'obstacle
+                if (currentY - 1.5 < box.max.y && playerBox.intersectsBox(box)) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        // Calcul de la hauteur du sol sous le joueur (sol normal ou dessus de caisse/plateforme)
+        const getGroundHeight = (posX, posZ, currentY) => {
+            let highestGround = 1.7; // Hauteur des yeux au sol normal (1.7m)
+
+            for (let i = 0; i < colliders.length; i++) {
+                const box = colliders[i];
+                if (
+                    posX >= box.min.x - playerRadius &&
+                    posX <= box.max.x + playerRadius &&
+                    posZ >= box.min.z - playerRadius &&
+                    posZ <= box.max.z + playerRadius
+                ) {
+                    const standableY = box.max.y + 1.7;
+                    // Si le joueur est au-dessus ou proche du sommet
+                    if (currentY >= standableY - 0.6) {
+                        if (standableY > highestGround) {
+                            highestGround = standableY;
+                        }
+                    }
+                }
+            }
+            return highestGround;
+        };
 
         const animate = () => {
             animId = requestAnimationFrame(animate);
@@ -439,14 +496,14 @@ export default function FirstPersonMap({ onExit }) {
             const time = performance.now();
             const delta = Math.min((time - prevTime) / 1000, 0.1);
 
-            // Animation des drones flottants
+            // Drones flottants
             targetDrones.forEach((drone) => {
                 drone.position.y = drone.userData.initialY + Math.sin(time * 0.003 + drone.userData.offset) * 0.35;
                 drone.userData.ring.rotation.x += 0.03;
                 drone.userData.ring.rotation.y += 0.04;
             });
 
-            // Déplacement des lasers
+            // Lasers
             for (let i = lasers.length - 1; i >= 0; i--) {
                 const laser = lasers[i];
                 laser.mesh.position.addScaledVector(laser.dir, 95 * delta);
@@ -457,11 +514,11 @@ export default function FirstPersonMap({ onExit }) {
                 }
             }
 
-            // Particules d'étincelles
+            // Étincelles
             for (let i = sparks.length - 1; i >= 0; i--) {
                 const sp = sparks[i];
                 sp.life -= delta * 2.5;
-                sp.vel.y -= 15 * delta; // gravité particule
+                sp.vel.y -= 15 * delta;
                 sp.mesh.position.addScaledVector(sp.vel, delta);
                 sp.mesh.scale.setScalar(Math.max(0.01, sp.life));
                 if (sp.life <= 0) {
@@ -471,9 +528,10 @@ export default function FirstPersonMap({ onExit }) {
             }
 
             if (controls.isLocked) {
+                // Frottements & Gravité
                 velocity.x -= velocity.x * 10.0 * delta;
                 velocity.z -= velocity.z * 10.0 * delta;
-                velocity.y -= 22.0 * delta;
+                velocity.y -= 22.0 * delta; // Gravité
 
                 direction.z = Number(moveState.forward) - Number(moveState.backward);
                 direction.x = Number(moveState.right) - Number(moveState.left);
@@ -485,13 +543,36 @@ export default function FirstPersonMap({ onExit }) {
                 if (moveState.forward || moveState.backward) velocity.z -= direction.z * baseSpeed * delta;
                 if (moveState.left || moveState.right) velocity.x -= direction.x * baseSpeed * delta;
 
+                // Application du mouvement avec résolution de collision pas-à-pas
+                const prevX = camera.position.x;
+                const prevZ = camera.position.z;
+
+                // 1. Déplacement latéral (X)
                 controls.moveRight(-velocity.x * delta);
+                if (checkCollision(camera.position.x, camera.position.z, camera.position.y)) {
+                    camera.position.x = prevX;
+                    velocity.x = 0;
+                }
+
+                // 2. Déplacement avant/arrière (Z)
                 controls.moveForward(-velocity.z * delta);
+                if (checkCollision(camera.position.x, camera.position.z, camera.position.y)) {
+                    camera.position.z = prevZ;
+                    velocity.z = 0;
+                }
 
+                // 3. Déplacement vertical & Hauteur du sol (Marche sur caisses / plateformes)
                 camera.position.y += velocity.y * delta;
+                const currentGround = getGroundHeight(camera.position.x, camera.position.z, camera.position.y);
 
-                // Head-Bobbing & Balancement de l'arme
-                if (isMoving && camera.position.y <= 1.72) {
+                if (camera.position.y <= currentGround) {
+                    camera.position.y = currentGround;
+                    velocity.y = 0;
+                    canJump = true;
+                }
+
+                // Head-Bobbing
+                if (isMoving && Math.abs(camera.position.y - currentGround) < 0.05) {
                     walkCycle += delta * (moveState.sprint ? 14 : 9);
                     weaponGroup.position.x = Math.sin(walkCycle) * 0.015;
                     weaponGroup.position.y = Math.cos(walkCycle * 2) * 0.012;
@@ -500,14 +581,9 @@ export default function FirstPersonMap({ onExit }) {
                     weaponGroup.position.y = THREE.MathUtils.lerp(weaponGroup.position.y, 0, 0.1);
                 }
 
-                if (camera.position.y < 1.7) {
-                    velocity.y = 0;
-                    camera.position.y = 1.7;
-                    canJump = true;
-                }
-
-                camera.position.x = Math.max(-48, Math.min(48, camera.position.x));
-                camera.position.z = Math.max(-48, Math.min(48, camera.position.z));
+                // Limites extérieures absolues
+                camera.position.x = Math.max(-47, Math.min(47, camera.position.x));
+                camera.position.z = Math.max(-47, Math.min(47, camera.position.z));
             }
 
             composer.render();
@@ -559,11 +635,11 @@ export default function FirstPersonMap({ onExit }) {
 
             {/* HUD Supérieur Sci-Fi */}
             <div className="pointer-events-none absolute top-4 left-6 z-20 flex items-center gap-4 font-mono text-xs sm:text-sm text-zinc-300">
-                <div className="px-3.5 py-1.5 bg-slate-950/80 border border-emerald-500/40 rounded-xl backdrop-blur-md shadow-[0_0_20px_rgba(16,185,129,0.15)] flex items-center gap-2">
+                <div className="px-3.5 py-1.5 bg-slate-950/85 border border-emerald-500/40 rounded-xl backdrop-blur-md shadow-[0_0_20px_rgba(16,185,129,0.2)] flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span>SECTEUR 3D : <strong className="text-emerald-400 font-bold">STATION ALPHA (PBR + BLOOM)</strong></span>
+                    <span>ZONE 3D : <strong className="text-emerald-400 font-bold">STATION ALPHA (PBR + COLLISIONS ACTIVES)</strong></span>
                 </div>
-                <div className="px-3.5 py-1.5 bg-slate-950/80 border border-zinc-700 rounded-xl backdrop-blur-md">
+                <div className="px-3.5 py-1.5 bg-slate-950/85 border border-zinc-700 rounded-xl backdrop-blur-md">
                     DRONES DÉTRUITS : <strong className="text-emerald-400 font-bold">{targetsHit}</strong> / {totalTargets}
                 </div>
             </div>
@@ -583,13 +659,13 @@ export default function FirstPersonMap({ onExit }) {
                 <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/75 backdrop-blur-md text-white pointer-events-auto">
                     <div className="max-w-md w-full mx-4 p-8 bg-zinc-950/95 border border-emerald-500/30 rounded-2xl shadow-[0_0_60px_rgba(16,185,129,0.2)] text-center">
                         <div className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full text-xs font-mono font-bold tracking-widest uppercase mb-3">
-                            Moteur 3D PBR & Post-Processing
+                            Moteur 3D • Éclairage Amélioré & Collisions
                         </div>
                         <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-wider mb-2 text-white font-mono">
                             Zone de Test Graphique
                         </h2>
                         <p className="text-xs text-zinc-400 mb-6">
-                            Cliquez pour activer la vue FPS libre avec textures PBR, éclairage HDR, bloom et physique dynamique.
+                            L'environnement est maintenant plus lumineux avec un système physique de collisions réelles (murs, piliers, caisses montables).
                         </p>
 
                         <div className="space-y-2 mb-6 text-xs text-zinc-300 bg-zinc-900/80 p-4 rounded-xl border border-zinc-800 text-left font-mono">
@@ -602,8 +678,8 @@ export default function FirstPersonMap({ onExit }) {
                                 <strong className="text-zinc-200">Z, Q, S, D / Flèches</strong>
                             </div>
                             <div className="flex justify-between py-0.5">
-                                <span className="text-zinc-400">Saut / Gravité :</span>
-                                <strong className="text-zinc-200">Espace</strong>
+                                <span className="text-zinc-400">Sauter / Monter :</span>
+                                <strong className="text-zinc-200">Espace (grimpez sur les caisses)</strong>
                             </div>
                             <div className="flex justify-between py-0.5">
                                 <span className="text-zinc-400">Course (Sprint) :</span>
