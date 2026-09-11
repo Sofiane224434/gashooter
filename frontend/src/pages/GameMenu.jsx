@@ -2,11 +2,16 @@ import { useState, useEffect } from 'react';
 import SpaceBackground from '../components/game/SpaceBackground.jsx';
 import SettingsModal from '../components/game/SettingsModal.jsx';
 import CreditsModal from '../components/game/CreditsModal.jsx';
+import FirstPersonMap from '../components/game/FirstPersonMap.jsx';
 
 export default function GameMenu() {
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [activeModal, setActiveModal] = useState(null); // 'settings', 'credits', 'newgame'
     const [gameStarted, setGameStarted] = useState(false);
+
+    if (gameStarted) {
+        return <FirstPersonMap onExit={() => setGameStarted(false)} />;
+    }
 
     const menuItems = [
         { id: 'new_game', label: 'Nouvelle Partie', action: () => setActiveModal('newgame') },
