@@ -46,27 +46,27 @@ jobs:
               DB_ROOT_PASSWORD=$(openssl rand -hex 16 2>/dev/null || echo "root_secret")
               DB_PASSWORD=$(openssl rand -hex 16 2>/dev/null || echo "gashooter_pass")
 
-              cat <<EOF > .env
-PORT=5000
-NODE_ENV=production
-APP_URL=https://gashooter.azim404.com
-CORS_ORIGIN=https://gashooter.azim404.com
-
-DB_HOST=db
-DB_USER=gashooter_user
-DB_PASSWORD=$DB_PASSWORD
-DB_NAME=gashooter_db
-DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD
-
-JWT_SECRET=$JWT_SECRET
-JWT_EXPIRES_IN=7d
-
-BREVO_API_KEY=
-BREVO_SENDER_EMAIL=
-BREVO_SENDER_NAME=Gashooter
-
-DEEPL_API_KEY=
-EOF
+              {
+                echo "PORT=5000"
+                echo "NODE_ENV=production"
+                echo "APP_URL=https://gashooter.azim404.com"
+                echo "CORS_ORIGIN=https://gashooter.azim404.com"
+                echo ""
+                echo "DB_HOST=db"
+                echo "DB_USER=gashooter_user"
+                echo "DB_PASSWORD=$DB_PASSWORD"
+                echo "DB_NAME=gashooter_db"
+                echo "DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD"
+                echo ""
+                echo "JWT_SECRET=$JWT_SECRET"
+                echo "JWT_EXPIRES_IN=7d"
+                echo ""
+                echo "BREVO_API_KEY="
+                echo "BREVO_SENDER_EMAIL="
+                echo "BREVO_SENDER_NAME=Gashooter"
+                echo ""
+                echo "DEEPL_API_KEY="
+              } > .env
               chmod 600 .env
             fi
 
