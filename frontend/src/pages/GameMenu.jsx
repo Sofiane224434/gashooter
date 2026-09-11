@@ -9,10 +9,6 @@ export default function GameMenu() {
     const [activeModal, setActiveModal] = useState(null); // 'settings', 'credits', 'newgame'
     const [gameStarted, setGameStarted] = useState(false);
 
-    if (gameStarted) {
-        return <FirstPersonMap onExit={() => setGameStarted(false)} />;
-    }
-
     const menuItems = [
         { id: 'new_game', label: 'Nouvelle Partie', action: () => setActiveModal('newgame') },
         { id: 'continue', label: 'Continuer', action: () => setActiveModal('continue') },
@@ -23,6 +19,8 @@ export default function GameMenu() {
 
     // Navigation Clavier classique (Haut, Bas, Entrée, Échap)
     useEffect(() => {
+        if (gameStarted) return; // Ne pas écouter le menu quand on est en jeu
+
         const handleKeyDown = (e) => {
             if (activeModal) {
                 if (e.key === 'Escape') {
@@ -45,7 +43,12 @@ export default function GameMenu() {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [activeModal, selectedIndex]);
+    }, [activeModal, selectedIndex, gameStarted]);
+
+    // Rendu conditionnel après l'appel de TOUS les hooks
+    if (gameStarted) {
+        return <FirstPersonMap onExit={() => setGameStarted(false)} />;
+    }
 
     return (
         <div className="relative min-h-screen w-full bg-[#0a0c10] text-zinc-100 flex flex-col justify-between select-none overflow-hidden font-sans">
