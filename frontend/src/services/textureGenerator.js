@@ -1,141 +1,246 @@
 import * as THREE from 'three';
 
-// Générateur de textures PBR procédurales seamless haute définition (sans aucun temps de chargement réseau)
+// Générateur de textures PBR avancées pour les différentes zones thématiques
 export class PBRTextureGenerator {
-    static createSciFiFloorMaterial(repeatX = 25, repeatY = 25) {
+    // 1. Sol Hangar Militaire / Industriel (Dalles d'acier avec grille et rivets)
+    static createIndustrialMetalMaterial(repeatX = 20, repeatY = 20) {
         const size = 512;
-        
-        // 1. Color Canvas
         const colorCanvas = document.createElement('canvas');
         colorCanvas.width = size;
         colorCanvas.height = size;
         const ctx = colorCanvas.getContext('2d');
 
-        // Fond métal sombre
-        ctx.fillStyle = '#0f172a';
+        ctx.fillStyle = '#1e293b';
         ctx.fillRect(0, 0, size, size);
 
-        // Dalles métalliques
+        // Motifs de tôles larmées / dalles industrielles
         const tileSize = size / 4;
         for (let x = 0; x < size; x += tileSize) {
             for (let y = 0; y < size; y += tileSize) {
-                // Plaque
-                ctx.fillStyle = ( (x / tileSize + y / tileSize) % 2 === 0 ) ? '#172033' : '#131b2e';
-                ctx.fillRect(x + 4, y + 4, tileSize - 8, tileSize - 8);
-
-                // Bordure biseautée
-                ctx.strokeStyle = '#334155';
+                ctx.fillStyle = ( (x/tileSize + y/tileSize) % 2 === 0 ) ? '#334155' : '#273549';
+                ctx.fillRect(x + 3, y + 3, tileSize - 6, tileSize - 6);
+                ctx.strokeStyle = '#475569';
                 ctx.lineWidth = 2;
-                ctx.strokeRect(x + 5, y + 5, tileSize - 10, tileSize - 10);
+                ctx.strokeRect(x + 4, y + 4, tileSize - 8, tileSize - 8);
 
-                // Rivets aux 4 coins
+                // Grips métalliques
                 ctx.fillStyle = '#64748b';
-                const rivets = [
-                    [x + 12, y + 12],
-                    [x + tileSize - 12, y + 12],
-                    [x + 12, y + tileSize - 12],
-                    [x + tileSize - 12, y + tileSize - 12]
-                ];
-                rivets.forEach(([rx, ry]) => {
-                    ctx.beginPath();
-                    ctx.arc(rx, ry, 2.5, 0, Math.PI * 2);
-                    ctx.fill();
-                });
+                for (let gx = x + 16; gx < x + tileSize - 16; gx += 20) {
+                    for (let gy = y + 16; gy < y + tileSize - 16; gy += 20) {
+                        ctx.fillRect(gx, gy, 8, 3);
+                    }
+                }
             }
         }
 
-        // Conduits d'énergie néon
-        ctx.strokeStyle = '#059669';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(0, size / 2);
-        ctx.lineTo(size, size / 2);
-        ctx.moveTo(size / 2, 0);
-        ctx.lineTo(size / 2, size);
-        ctx.stroke();
-
-        // 2. Normal Canvas (Calcul de relief PBR)
-        const normalCanvas = document.createElement('canvas');
-        normalCanvas.width = size;
-        normalCanvas.height = size;
-        const nCtx = normalCanvas.getContext('2d');
-        nCtx.fillStyle = 'rgb(128, 128, 255)'; // Normal plane
-        nCtx.fillRect(0, 0, size, size);
-
-        for (let x = 0; x < size; x += tileSize) {
-            for (let y = 0; y < size; y += tileSize) {
-                // Reliefs des bords de dalles
-                nCtx.fillStyle = 'rgb(160, 128, 240)'; // Pente gauche
-                nCtx.fillRect(x + 4, y + 4, 3, tileSize - 8);
-                nCtx.fillStyle = 'rgb(96, 128, 240)'; // Pente droite
-                nCtx.fillRect(x + tileSize - 7, y + 4, 3, tileSize - 8);
-                nCtx.fillStyle = 'rgb(128, 160, 240)'; // Pente haut
-                nCtx.fillRect(x + 4, y + 4, tileSize - 8, 3);
-                nCtx.fillStyle = 'rgb(128, 96, 240)'; // Pente bas
-                nCtx.fillRect(x + 4, y + tileSize - 7, tileSize - 8, 3);
-            }
-        }
-
-        // 3. Roughness Canvas
-        const roughCanvas = document.createElement('canvas');
-        roughCanvas.width = size;
-        roughCanvas.height = size;
-        const rCtx = roughCanvas.getContext('2d');
-        rCtx.fillStyle = '#666666'; // Métal semi-brillant
-        rCtx.fillRect(0, 0, size, size);
-        // Rainures plus mates
-        rCtx.fillStyle = '#111111';
-        for (let x = 0; x < size; x += tileSize) {
-            rCtx.fillRect(x, 0, 4, size);
-        }
-        for (let y = 0; y < size; y += tileSize) {
-            rCtx.fillRect(0, y, size, 4);
-        }
-
-        // 4. Emissive Canvas (Lueur des néons au sol)
-        const emCanvas = document.createElement('canvas');
-        emCanvas.width = size;
-        emCanvas.height = size;
-        const eCtx = emCanvas.getContext('2d');
-        eCtx.fillStyle = '#000000';
-        eCtx.fillRect(0, 0, size, size);
-        eCtx.strokeStyle = '#10b981';
-        eCtx.lineWidth = 3;
-        eCtx.beginPath();
-        eCtx.moveTo(0, size / 2);
-        eCtx.lineTo(size, size / 2);
-        eCtx.moveTo(size / 2, 0);
-        eCtx.lineTo(size / 2, size);
-        eCtx.stroke();
-
-        // Conversion en Textures Three.js
         const colorTex = new THREE.CanvasTexture(colorCanvas);
-        const normalTex = new THREE.CanvasTexture(normalCanvas);
-        const roughTex = new THREE.CanvasTexture(roughCanvas);
-        const emTex = new THREE.CanvasTexture(emCanvas);
-
-        [colorTex, normalTex, roughTex, emTex].forEach((tex) => {
-            tex.wrapS = THREE.RepeatWrapping;
-            tex.wrapT = THREE.RepeatWrapping;
-            tex.repeat.set(repeatX, repeatY);
-        });
-
+        colorTex.wrapS = THREE.RepeatWrapping;
+        colorTex.wrapT = THREE.RepeatWrapping;
+        colorTex.repeat.set(repeatX, repeatY);
         colorTex.colorSpace = THREE.SRGBColorSpace;
-        emTex.colorSpace = THREE.SRGBColorSpace;
 
         return new THREE.MeshStandardMaterial({
             map: colorTex,
-            normalMap: normalTex,
-            normalScale: new THREE.Vector2(1.2, 1.2),
-            roughnessMap: roughTex,
-            roughness: 0.4,
-            metalness: 0.6,
-            emissiveMap: emTex,
-            emissive: new THREE.Color(0x10b981),
-            emissiveIntensity: 0.8
+            roughness: 0.45,
+            metalness: 0.65
         });
     }
 
+    // 2. Sol Laboratoire & Réacteur Toxique (Hexagones carbones + conduits verts)
+    static createToxicFloorMaterial(repeatX = 15, repeatY = 15) {
+        const size = 512;
+        const colorCanvas = document.createElement('canvas');
+        colorCanvas.width = size;
+        colorCanvas.height = size;
+        const ctx = colorCanvas.getContext('2d');
+
+        ctx.fillStyle = '#090d16';
+        ctx.fillRect(0, 0, size, size);
+
+        // Trame hexagonale
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 3;
+        for (let x = 0; x < size; x += 64) {
+            for (let y = 0; y < size; y += 64) {
+                ctx.strokeRect(x, y, 60, 60);
+            }
+        }
+
+        // Conduits de gaz bio-luminescents
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(size / 2, size / 2, 120, 0, Math.PI * 2);
+        ctx.moveTo(0, size / 2);
+        ctx.lineTo(size, size / 2);
+        ctx.stroke();
+
+        const colorTex = new THREE.CanvasTexture(colorCanvas);
+        colorTex.wrapS = THREE.RepeatWrapping;
+        colorTex.wrapT = THREE.RepeatWrapping;
+        colorTex.repeat.set(repeatX, repeatY);
+        colorTex.colorSpace = THREE.SRGBColorSpace;
+
+        return new THREE.MeshStandardMaterial({
+            map: colorTex,
+            roughness: 0.25,
+            metalness: 0.8,
+            emissive: new THREE.Color(0x059669),
+            emissiveIntensity: 0.3
+        });
+    }
+
+    // 3. Sol Surface Lunaire / Canyon Extérieur (Roches sombres)
+    static createLunarRockMaterial(repeatX = 25, repeatY = 25) {
+        const size = 512;
+        const colorCanvas = document.createElement('canvas');
+        colorCanvas.width = size;
+        colorCanvas.height = size;
+        const ctx = colorCanvas.getContext('2d');
+
+        ctx.fillStyle = '#18181b';
+        ctx.fillRect(0, 0, size, size);
+
+        // Bruit procédural de roche
+        for (let i = 0; i < 4000; i++) {
+            const x = Math.random() * size;
+            const y = Math.random() * size;
+            const r = Math.random() * 3 + 1;
+            ctx.fillStyle = Math.random() > 0.5 ? '#27272a' : '#09090b';
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        const colorTex = new THREE.CanvasTexture(colorCanvas);
+        colorTex.wrapS = THREE.RepeatWrapping;
+        colorTex.wrapT = THREE.RepeatWrapping;
+        colorTex.repeat.set(repeatX, repeatY);
+        colorTex.colorSpace = THREE.SRGBColorSpace;
+
+        return new THREE.MeshStandardMaterial({
+            map: colorTex,
+            roughness: 0.9,
+            metalness: 0.1
+        });
+    }
+
+    // 4. Plateformes d'énergie & Caillebotis métallique (Parkour / Saut)
+    static createPlatformGrateMaterial() {
+        const size = 256;
+        const colorCanvas = document.createElement('canvas');
+        colorCanvas.width = size;
+        colorCanvas.height = size;
+        const ctx = colorCanvas.getContext('2d');
+
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, size, size);
+
+        // Grille jaune et noire avec bordure lumineuse cyan
+        ctx.strokeStyle = '#0284c7';
+        ctx.lineWidth = 6;
+        ctx.strokeRect(4, 4, size - 8, size - 8);
+
+        // Flèches d'impulsion de saut
+        ctx.fillStyle = '#38bdf8';
+        ctx.beginPath();
+        ctx.moveTo(size / 2, 40);
+        ctx.lineTo(size / 2 + 40, 100);
+        ctx.lineTo(size / 2 - 40, 100);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(size / 2, 110);
+        ctx.lineTo(size / 2 + 40, 170);
+        ctx.lineTo(size / 2 - 40, 170);
+        ctx.closePath();
+        ctx.fill();
+
+        const colorTex = new THREE.CanvasTexture(colorCanvas);
+        colorTex.colorSpace = THREE.SRGBColorSpace;
+
+        return new THREE.MeshStandardMaterial({
+            map: colorTex,
+            roughness: 0.3,
+            metalness: 0.7,
+            emissive: new THREE.Color(0x0284c7),
+            emissiveIntensity: 0.4
+        });
+    }
+
+    // 5. Conteneur Maritime Sci-Fi (Grand conteneur de transport)
+    static createContainerMaterial(color = '#0284c7', label = 'CARGO-01') {
+        const size = 512;
+        const colorCanvas = document.createElement('canvas');
+        colorCanvas.width = size;
+        colorCanvas.height = size;
+        const ctx = colorCanvas.getContext('2d');
+
+        ctx.fillStyle = color;
+        ctx.fillRect(0, 0, size, size);
+
+        // Ondulations du conteneur
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        for (let x = 0; x < size; x += 32) {
+            ctx.fillRect(x, 0, 14, size);
+        }
+
+        // Bordure métallique sombre
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 12;
+        ctx.strokeRect(6, 6, size - 12, size - 12);
+
+        // Texte / Numéro
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 36px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(label, size / 2, size / 2);
+
+        const colorTex = new THREE.CanvasTexture(colorCanvas);
+        colorTex.colorSpace = THREE.SRGBColorSpace;
+
+        return new THREE.MeshStandardMaterial({
+            map: colorTex,
+            roughness: 0.5,
+            metalness: 0.5
+        });
+    }
+
+    // 6. Cuve & Réservoir de Gaz Bio-chimique
+    static createBioTankMaterial() {
+        const size = 256;
+        const colorCanvas = document.createElement('canvas');
+        colorCanvas.width = size;
+        colorCanvas.height = size;
+        const ctx = colorCanvas.getContext('2d');
+
+        ctx.fillStyle = '#10b981';
+        ctx.fillRect(0, 0, size, size);
+
+        // Indicateurs de niveau
+        ctx.fillStyle = '#064e3b';
+        ctx.fillRect(0, 0, size, 40);
+        ctx.fillRect(0, size - 40, size, 40);
+
+        ctx.fillStyle = '#a7f3d0';
+        ctx.font = 'bold 20px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('⚡ TOXIC BIO-GAS ⚡', size / 2, size / 2);
+
+        const colorTex = new THREE.CanvasTexture(colorCanvas);
+        colorTex.colorSpace = THREE.SRGBColorSpace;
+
+        return new THREE.MeshStandardMaterial({
+            map: colorTex,
+            roughness: 0.2,
+            metalness: 0.8,
+            emissive: new THREE.Color(0x10b981),
+            emissiveIntensity: 0.5
+        });
+    }
+
+    // 7. Mur Général de la Station
     static createWallMaterial(repeatX = 10, repeatY = 2) {
         const size = 512;
         const colorCanvas = document.createElement('canvas');
@@ -143,21 +248,19 @@ export class PBRTextureGenerator {
         colorCanvas.height = size;
         const ctx = colorCanvas.getContext('2d');
 
-        // Panneau composite de bunker
         ctx.fillStyle = '#1e293b';
         ctx.fillRect(0, 0, size, size);
 
-        // Plaques verticales de blindage
         ctx.fillStyle = '#0f172a';
         ctx.fillRect(16, 16, size - 32, size - 32);
 
-        // Lignes de ventilation sci-fi
+        // Grilles d'aération
         ctx.fillStyle = '#020617';
         for (let y = 60; y < size - 60; y += 24) {
             ctx.fillRect(40, y, size - 80, 10);
         }
 
-        // Bande de signalisation de sécurité
+        // Liseré jaune sécurité
         ctx.fillStyle = '#eab308';
         ctx.fillRect(0, size - 24, size, 24);
         ctx.fillStyle = '#000000';
@@ -180,42 +283,6 @@ export class PBRTextureGenerator {
             map: colorTex,
             roughness: 0.5,
             metalness: 0.4
-        });
-    }
-
-    static createCrateMaterial() {
-        const size = 256;
-        const colorCanvas = document.createElement('canvas');
-        colorCanvas.width = size;
-        colorCanvas.height = size;
-        const ctx = colorCanvas.getContext('2d');
-
-        // Caisse métallique militaire sci-fi
-        ctx.fillStyle = '#334155';
-        ctx.fillRect(0, 0, size, size);
-
-        // Centre renforcé
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(16, 16, size - 32, size - 32);
-
-        // Logo toxique / Gas
-        ctx.strokeStyle = '#10b981';
-        ctx.lineWidth = 4;
-        ctx.strokeRect(32, 32, size - 64, size - 64);
-
-        ctx.fillStyle = '#10b981';
-        ctx.font = 'bold 24px monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('GAS-X7', size / 2, size / 2);
-
-        const colorTex = new THREE.CanvasTexture(colorCanvas);
-        colorTex.colorSpace = THREE.SRGBColorSpace;
-
-        return new THREE.MeshStandardMaterial({
-            map: colorTex,
-            roughness: 0.35,
-            metalness: 0.7
         });
     }
 }

@@ -14,7 +14,8 @@ export default function FirstPersonMap({ onExit }) {
 
     const [isLocked, setIsLocked] = useState(false);
     const [targetsHit, setTargetsHit] = useState(0);
-    const totalTargets = 8;
+    const [currentZoneName, setCurrentZoneName] = useState('HANGAR DE CHARGEMENT');
+    const totalTargets = 10;
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -22,8 +23,8 @@ export default function FirstPersonMap({ onExit }) {
 
         // 1. Scene, Camera & Renderer
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x111827); // Ciel plus clair et visible
-        scene.fog = new THREE.FogExp2(0x0f172a, 0.008); // Brouillard léger sans assombrir
+        scene.background = new THREE.Color(0x0f172a);
+        scene.fog = new THREE.FogExp2(0x0f172a, 0.007);
 
         const camera = new THREE.PerspectiveCamera(
             75,
@@ -31,7 +32,7 @@ export default function FirstPersonMap({ onExit }) {
             0.1,
             1000
         );
-        camera.position.set(0, 1.7, 14);
+        camera.position.set(-15, 1.7, 25); // Spawn dans le Hangar
 
         const renderer = new THREE.WebGLRenderer({
             canvas: canvas,
@@ -43,17 +44,17 @@ export default function FirstPersonMap({ onExit }) {
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.45; // Luminosité vive et contrastée
+        renderer.toneMappingExposure = 1.4;
         renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-        // 2. Post-Processing (Bloom pour lueurs & OutputPass)
+        // 2. Post-Processing
         const composer = new EffectComposer(renderer);
         const renderPass = new RenderPass(scene, camera);
         composer.addPass(renderPass);
 
         const bloomPass = new UnrealBloomPass(
             new THREE.Vector2(window.innerWidth, window.innerHeight),
-            0.6, // Force équilibrée
+            0.65,
             0.4,
             0.75
         );
@@ -62,98 +63,94 @@ export default function FirstPersonMap({ onExit }) {
         const outputPass = new OutputPass();
         composer.addPass(outputPass);
 
-        // 3. Éclairages Puissants & Lumineux
-        // Lumière ambiante claire
-        const ambientLight = new THREE.AmbientLight(0xffffff, 2.5);
+        // 3. Éclairages
+        const ambientLight = new THREE.AmbientLight(0xffffff, 2.6);
         scene.add(ambientLight);
 
-        // Soleil principal
         const sunLight = new THREE.DirectionalLight(0xf8fafc, 3.2);
-        sunLight.position.set(35, 50, 25);
+        sunLight.position.set(40, 60, 30);
         sunLight.castShadow = true;
         sunLight.shadow.mapSize.width = 2048;
         sunLight.shadow.mapSize.height = 2048;
-        sunLight.shadow.camera.near = 1;
-        sunLight.shadow.camera.far = 140;
         sunLight.shadow.bias = -0.0004;
         scene.add(sunLight);
 
-        // Lumière de débouchage opposée (Fill Light)
-        const fillLight = new THREE.DirectionalLight(0x93c5fd, 1.6);
-        fillLight.position.set(-35, 40, -25);
+        const fillLight = new THREE.DirectionalLight(0x93c5fd, 1.8);
+        fillLight.position.set(-40, 45, -30);
         scene.add(fillLight);
 
-        // Projecteurs de plafond de la station (Hangar Floodlights)
-        const addFloodlight = (x, z, color = 0xffffff) => {
-            const light = new THREE.PointLight(color, 4.5, 45, 1.2);
-            light.position.set(x, 10, z);
+        // Lumières thématiques par zone
+        const addZoneLight = (x, y, z, color, intensity = 4.5, dist = 40) => {
+            const light = new THREE.PointLight(color, intensity, dist, 1.2);
+            light.position.set(x, y, z);
             scene.add(light);
 
-            // Lampe visible
-            const bulbGeo = new THREE.SphereGeometry(0.3, 16, 16);
-            const bulbMat = new THREE.MeshBasicMaterial({ color });
-            const bulb = new THREE.Mesh(bulbGeo, bulbMat);
-            bulb.position.set(x, 10, z);
+            const bulb = new THREE.Mesh(
+                new THREE.SphereGeometry(0.35, 16, 16),
+                new THREE.MeshBasicMaterial({ color })
+            );
+            bulb.position.set(x, y, z);
             scene.add(bulb);
         };
 
-        addFloodlight(-20, -20, 0x38bdf8);
-        addFloodlight(20, -20, 0x10b981);
-        addFloodlight(-20, 20, 0x10b981);
-        addFloodlight(20, 20, 0x38bdf8);
-        addFloodlight(0, 10, -25, 0xc084fc);
+        // Éclairage Hangar (Cyan/Blanc)
+        addZoneLight(-20, 9, 20, 0x38bdf8);
+        // Éclairage Parkour (Bleu/Violet)
+        addZoneLight(-25, 12, -25, 0x818cf8);
+        // Éclairage Labo Toxique (Vert émeraude intense)
+        addZoneLight(25, 9, -25, 0x10b981);
+        addZoneLight(25, 5, -12, 0x34d399);
+        // Éclairage Canyon Lunaire (Ambré/Orange)
+        addZoneLight(25, 9, 25, 0xf59e0b);
 
-        // 4. Matériaux PBR Seamless
-        const floorPbrMat = PBRTextureGenerator.createSciFiFloorMaterial(30, 30);
-        const wallPbrMat = PBRTextureGenerator.createWallMaterial(10, 2);
-        const cratePbrMat = PBRTextureGenerator.createCrateMaterial();
+        // 4. Matériaux PBR Thématiques
+        const hangarFloorMat = PBRTextureGenerator.createIndustrialMetalMaterial(15, 15);
+        const toxicFloorMat = PBRTextureGenerator.createToxicFloorMaterial(12, 12);
+        const lunarFloorMat = PBRTextureGenerator.createLunarRockMaterial(18, 18);
+        const platformMat = PBRTextureGenerator.createPlatformGrateMaterial();
+        const containerBlueMat = PBRTextureGenerator.createContainerMaterial('#0284c7', 'CARGO-A1');
+        const containerOrangeMat = PBRTextureGenerator.createContainerMaterial('#d97706', 'FUEL-X9');
+        const bioTankMat = PBRTextureGenerator.createBioTankMaterial();
+        const wallMat = PBRTextureGenerator.createWallMaterial(10, 2);
 
-        // 5. Sol PBR
-        const floorGeo = new THREE.PlaneGeometry(100, 100);
-        const floor = new THREE.Mesh(floorGeo, floorPbrMat);
-        floor.rotation.x = -Math.PI / 2;
-        floor.receiveShadow = true;
-        scene.add(floor);
+        // 5. Sols différenciés par quadrants (4 Zones)
+        const addFloorSection = (x, z, w, d, material) => {
+            const geo = new THREE.PlaneGeometry(w, d);
+            const mesh = new THREE.Mesh(geo, material);
+            mesh.position.set(x, 0, z);
+            mesh.rotation.x = -Math.PI / 2;
+            mesh.receiveShadow = true;
+            scene.add(mesh);
+            return mesh;
+        };
 
-        // 6. Système de Boîtes de Collision (AABB)
+        // Zone 1: Hangar (Sud-Ouest)
+        addFloorSection(-25, 25, 50, 50, hangarFloorMat);
+        // Zone 2: Parkour & Plateformes (Nord-Ouest)
+        addFloorSection(-25, -25, 50, 50, hangarFloorMat);
+        // Zone 3: Labo Toxique (Nord-Est)
+        addFloorSection(25, -25, 50, 50, toxicFloorMat);
+        // Zone 4: Canyon Lunaire (Sud-Est)
+        addFloorSection(25, 25, 50, 50, lunarFloorMat);
+
+        // Ligne de démarcation centrale lumineuse
+        const centerLineGeo = new THREE.BoxGeometry(100, 0.05, 0.8);
+        const centerLineMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+        const lineX = new THREE.Mesh(centerLineGeo, centerLineMat);
+        lineX.position.set(0, 0.02, 0);
+        scene.add(lineX);
+
+        const lineZ = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.05, 100), centerLineMat);
+        lineZ.position.set(0, 0.02, 0);
+        scene.add(lineZ);
+
+        // 6. Murs d'enceinte globaux
         const colliders = [];
 
-        // Murs d'enceinte PBR
-        const wallGeoH = new THREE.BoxGeometry(100, 8, 2);
-        const wallNorth = new THREE.Mesh(wallGeoH, wallPbrMat);
-        wallNorth.position.set(0, 4, -50);
-        wallNorth.castShadow = true;
-        wallNorth.receiveShadow = true;
-        scene.add(wallNorth);
-        colliders.push(new THREE.Box3().setFromObject(wallNorth));
-
-        const wallSouth = new THREE.Mesh(wallGeoH, wallPbrMat);
-        wallSouth.position.set(0, 4, 50);
-        wallSouth.castShadow = true;
-        wallSouth.receiveShadow = true;
-        scene.add(wallSouth);
-        colliders.push(new THREE.Box3().setFromObject(wallSouth));
-
-        const wallGeoV = new THREE.BoxGeometry(2, 8, 100);
-        const wallWest = new THREE.Mesh(wallGeoV, wallPbrMat);
-        wallWest.position.set(-50, 4, 0);
-        wallWest.castShadow = true;
-        wallWest.receiveShadow = true;
-        scene.add(wallWest);
-        colliders.push(new THREE.Box3().setFromObject(wallWest));
-
-        const wallEast = new THREE.Mesh(wallGeoV, wallPbrMat);
-        wallEast.position.set(50, 4, 0);
-        wallEast.castShadow = true;
-        wallEast.receiveShadow = true;
-        scene.add(wallEast);
-        colliders.push(new THREE.Box3().setFromObject(wallEast));
-
-        // 7. Caisses & Obstacles avec Collisions
-        const addCrate = (x, y, z, size = 2) => {
-            const geo = new THREE.BoxGeometry(size, size, size);
-            const mesh = new THREE.Mesh(geo, cratePbrMat);
-            mesh.position.set(x, y + size / 2, z);
+        const addWall = (x, y, z, w, h, d) => {
+            const geo = new THREE.BoxGeometry(w, h, d);
+            const mesh = new THREE.Mesh(geo, wallMat);
+            mesh.position.set(x, y, z);
             mesh.castShadow = true;
             mesh.receiveShadow = true;
             scene.add(mesh);
@@ -161,64 +158,115 @@ export default function FirstPersonMap({ onExit }) {
             return mesh;
         };
 
-        addCrate(6, 0, -4, 2.2);
-        addCrate(6, 2.2, -4, 1.8);
-        addCrate(8.4, 0, -4, 2);
-        addCrate(-8, 0, 5, 2.5);
-        addCrate(-8, 2.5, 5, 1.8);
-        addCrate(15, 0, 2, 2.2);
-        addCrate(-15, 0, -2, 2.2);
+        addWall(0, 4.5, -50, 100, 9, 2);
+        addWall(0, 4.5, 50, 100, 9, 2);
+        addWall(-50, 4.5, 0, 2, 9, 100);
+        addWall(50, 4.5, 0, 2, 9, 100);
 
-        // Piliers avec Collisions
-        const addPillar = (x, z) => {
-            const pillarGeo = new THREE.CylinderGeometry(1.4, 1.4, 10, 24);
-            const pillarMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4, metalness: 0.8 });
-            const pillar = new THREE.Mesh(pillarGeo, pillarMat);
-            pillar.position.set(x, 5, z);
-            pillar.castShadow = true;
-            pillar.receiveShadow = true;
-            scene.add(pillar);
-
-            // Anneau néon
-            const ringGeo = new THREE.TorusGeometry(1.5, 0.09, 16, 32);
-            const ringMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
-            const ring = new THREE.Mesh(ringGeo, ringMat);
-            ring.rotation.x = Math.PI / 2;
-            ring.position.set(x, 5, z);
-            scene.add(ring);
-
-            colliders.push(new THREE.Box3().setFromObject(pillar));
+        // Helper pour ajouter des boîtes / caisses / plateformes solides
+        const addSolidBox = (x, y, z, w, h, d, material) => {
+            const geo = new THREE.BoxGeometry(w, h, d);
+            const mesh = new THREE.Mesh(geo, material);
+            mesh.position.set(x, y + h / 2, z);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            scene.add(mesh);
+            colliders.push(new THREE.Box3().setFromObject(mesh));
+            return mesh;
         };
 
-        addPillar(-12, -12);
-        addPillar(12, -12);
-        addPillar(-12, 12);
-        addPillar(12, 12);
+        // ---------------------------------------------------------------------
+        // ZONE 1: HANGAR MILITAIRE (Sud-Ouest : X: -50..0, Z: 0..50)
+        // ---------------------------------------------------------------------
+        // Grands conteneurs de fret
+        addSolidBox(-30, 0, 20, 6, 4, 12, containerBlueMat);
+        addSolidBox(-30, 4, 20, 6, 4, 10, containerOrangeMat); // Deuxième étage
+        addSolidBox(-15, 0, 35, 12, 4, 6, containerOrangeMat);
 
-        // Plateforme d'observation
-        const platGeo = new THREE.BoxGeometry(20, 2, 14);
-        const platMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4, metalness: 0.7 });
-        const platform = new THREE.Mesh(platGeo, platMat);
-        platform.position.set(0, 1, -28);
-        platform.castShadow = true;
-        platform.receiveShadow = true;
-        scene.add(platform);
-        colliders.push(new THREE.Box3().setFromObject(platform));
+        // Escaliers de caisses pour monter sur les conteneurs
+        addSolidBox(-22, 0, 20, 2.5, 1.2, 2.5, hangarFloorMat);
+        addSolidBox(-25, 0, 20, 2.5, 2.5, 2.5, hangarFloorMat);
 
-        // 8. Cibles Drones 3D
+        // ---------------------------------------------------------------------
+        // ZONE 2: PARCOURS PARKOUR & PLATEFORMES (Nord-Ouest : X: -50..0, Z: -50..0)
+        // ---------------------------------------------------------------------
+        // Paliers flottants à hauteurs progressives
+        addSolidBox(-18, 0, -12, 4, 1.2, 4, platformMat);       // Palier 1: H=1.2m
+        addSolidBox(-26, 0, -12, 4, 2.6, 4, platformMat);       // Palier 2: H=2.6m
+        addSolidBox(-34, 0, -16, 4, 4.2, 4, platformMat);       // Palier 3: H=4.2m
+        addSolidBox(-34, 0, -26, 4, 5.8, 4, platformMat);       // Palier 4: H=5.8m
+        addSolidBox(-24, 0, -34, 5, 7.4, 5, platformMat);       // Palier 5: H=7.4m (Sommet)
+
+        // Passerelle suspendue de liaison
+        addSolidBox(-10, 0, -34, 16, 7.4, 3, platformMat);
+
+        // Piliers de soutien sous les plateformes
+        const addPillar = (x, z, h) => {
+            const geo = new THREE.CylinderGeometry(0.5, 0.5, h, 16);
+            const mat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8, roughness: 0.3 });
+            const pillar = new THREE.Mesh(geo, mat);
+            pillar.position.set(x, h / 2, z);
+            pillar.castShadow = true;
+            scene.add(pillar);
+        };
+        addPillar(-24, -34, 7.4);
+        addPillar(-34, -26, 5.8);
+
+        // ---------------------------------------------------------------------
+        // ZONE 3: LABORATOIRE BIO-TOXIQUE & RÉACTEUR (Nord-Est : X: 0..50, Z: -50..0)
+        // ---------------------------------------------------------------------
+        // Cuves de bio-gaz toxique cylindriques
+        const addBioTank = (x, z) => {
+            const geo = new THREE.CylinderGeometry(3, 3, 7, 24);
+            const tank = new THREE.Mesh(geo, bioTankMat);
+            tank.position.set(x, 3.5, z);
+            tank.castShadow = true;
+            tank.receiveShadow = true;
+            scene.add(tank);
+            colliders.push(new THREE.Box3().setFromObject(tank));
+
+            // Anneau de contention
+            const ring = new THREE.Mesh(
+                new THREE.TorusGeometry(3.2, 0.15, 16, 32),
+                new THREE.MeshBasicMaterial({ color: 0x10b981 })
+            );
+            ring.rotation.x = Math.PI / 2;
+            ring.position.set(x, 4.5, z);
+            scene.add(ring);
+        };
+
+        addBioTank(25, -20);
+        addBioTank(35, -35);
+        addBioTank(15, -35);
+
+        // Passerelle surélevée d'observation du réacteur
+        addSolidBox(25, 0, -20, 8, 2.5, 8, platformMat);
+
+        // ---------------------------------------------------------------------
+        // ZONE 4: ARÈNE / CANYON LUNAIRE (Sud-Est : X: 0..50, Z: 0..50)
+        // ---------------------------------------------------------------------
+        // Monolithes et abris de tir
+        addSolidBox(25, 0, 20, 4, 8, 4, lunarFloorMat);
+        addSolidBox(15, 0, 30, 2, 4, 8, lunarFloorMat);
+        addSolidBox(35, 0, 15, 8, 3, 2, lunarFloorMat);
+        addSolidBox(35, 0, 35, 5, 5, 5, containerBlueMat);
+
+        // 7. Cibles Drones réparties dans les 4 zones
         const targetDrones = [];
-        const dronePositions = [
-            [-12, 4.5, -12],
-            [12, 4.5, -12],
-            [0, 5.5, -28],
-            [-18, 3.5, 12],
-            [18, 3.5, 12],
-            [-25, 3.0, -8],
-            [25, 3.0, -8],
-            [0, 3.5, 18]
+        const droneLocations = [
+            { pos: [-30, 6, 20], zone: 'Hangar' },
+            { pos: [-15, 5, 35], zone: 'Hangar' },
+            { pos: [-34, 7.5, -26], zone: 'Parkour' },
+            { pos: [-24, 9.2, -34], zone: 'Parkour' },
+            { pos: [-10, 9.0, -34], zone: 'Passerelle' },
+            { pos: [25, 6, -20], zone: 'Labo Toxique' },
+            { pos: [35, 6.5, -35], zone: 'Labo Toxique' },
+            { pos: [15, 6.5, -35], zone: 'Labo Toxique' },
+            { pos: [25, 5.5, 20], zone: 'Canyon' },
+            { pos: [35, 6.0, 35], zone: 'Canyon' }
         ];
 
-        dronePositions.forEach((pos) => {
+        droneLocations.forEach(({ pos }) => {
             const droneGroup = new THREE.Group();
             droneGroup.position.set(pos[0], pos[1], pos[2]);
 
@@ -250,7 +298,7 @@ export default function FirstPersonMap({ onExit }) {
             targetDrones.push(droneGroup);
         });
 
-        // 9. Arme FPS Sci-Fi
+        // 8. Arme Blaster FPS
         const weaponGroup = new THREE.Group();
         const bodyGeo = new THREE.BoxGeometry(0.14, 0.18, 0.55);
         const bodyMat = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.3, metalness: 0.85 });
@@ -274,7 +322,7 @@ export default function FirstPersonMap({ onExit }) {
         camera.add(weaponGroup);
         scene.add(camera);
 
-        // 10. Particules d'Étincelles (Sparks)
+        // 9. Particules d'Étincelles (Sparks FX)
         const sparks = [];
         const sparkGeo = new THREE.SphereGeometry(0.04, 8, 8);
         const sparkMat = new THREE.MeshBasicMaterial({ color: 0x34d399 });
@@ -283,17 +331,17 @@ export default function FirstPersonMap({ onExit }) {
             for (let i = 0; i < 14; i++) {
                 const spark = new THREE.Mesh(sparkGeo, sparkMat);
                 spark.position.copy(pos);
-                const velocity = new THREE.Vector3(
+                const vel = new THREE.Vector3(
                     (Math.random() - 0.5) * 9,
                     Math.random() * 7 + 2,
                     (Math.random() - 0.5) * 9
                 );
                 scene.add(spark);
-                sparks.push({ mesh: spark, vel: velocity, life: 1.0 });
+                sparks.push({ mesh: spark, vel, life: 1.0 });
             }
         };
 
-        // 11. PointerLockControls & Clavier
+        // 10. PointerLockControls & Clavier
         const controls = new PointerLockControls(camera, canvas);
         const onLock = () => setIsLocked(true);
         const onUnlock = () => setIsLocked(false);
@@ -331,7 +379,7 @@ export default function FirstPersonMap({ onExit }) {
                     break;
                 case 'Space':
                     if (canJump) {
-                        velocity.y = 8.5;
+                        velocity.y = 8.8;
                         canJump = false;
                     }
                     break;
@@ -375,7 +423,7 @@ export default function FirstPersonMap({ onExit }) {
         window.addEventListener('keydown', onKeyDown);
         window.addEventListener('keyup', onKeyUp);
 
-        // 12. Tirs Blaster
+        // 11. Tirs Laser
         const raycaster = new THREE.Raycaster();
         const lasers = [];
 
@@ -406,8 +454,8 @@ export default function FirstPersonMap({ onExit }) {
                     setTargetsHit((prev) => prev + 1);
 
                     setTimeout(() => {
-                        obj.position.x = (Math.random() - 0.5) * 65;
-                        obj.position.z = (Math.random() - 0.5) * 65;
+                        obj.position.x = (Math.random() - 0.5) * 75;
+                        obj.position.z = (Math.random() - 0.5) * 75;
                         obj.userData.core.material.color.setHex(0xef4444);
                     }, 300);
                 }
@@ -432,7 +480,7 @@ export default function FirstPersonMap({ onExit }) {
 
         window.addEventListener('mousedown', fireLaser);
 
-        // 13. Redimensionnement
+        // 12. Resize
         const handleResize = () => {
             const w = window.innerWidth;
             const h = window.innerHeight;
@@ -443,13 +491,9 @@ export default function FirstPersonMap({ onExit }) {
         };
         window.addEventListener('resize', handleResize);
 
-        // 14. Moteur Physique & Détection des Collisions
-        let prevTime = performance.now();
-        let animId;
-        let walkCycle = 0;
+        // 13. Détection des collisions & Hauteur de sol
         const playerRadius = 0.55;
 
-        // Fonction de vérification de collision avec le joueur
         const checkCollision = (posX, posZ, currentY) => {
             const playerBox = new THREE.Box3(
                 new THREE.Vector3(posX - playerRadius, currentY - 1.6, posZ - playerRadius),
@@ -458,7 +502,6 @@ export default function FirstPersonMap({ onExit }) {
 
             for (let i = 0; i < colliders.length; i++) {
                 const box = colliders[i];
-                // Si le joueur est en dessous du sommet de l'obstacle
                 if (currentY - 1.5 < box.max.y && playerBox.intersectsBox(box)) {
                     return true;
                 }
@@ -466,9 +509,8 @@ export default function FirstPersonMap({ onExit }) {
             return false;
         };
 
-        // Calcul de la hauteur du sol sous le joueur (sol normal ou dessus de caisse/plateforme)
         const getGroundHeight = (posX, posZ, currentY) => {
-            let highestGround = 1.7; // Hauteur des yeux au sol normal (1.7m)
+            let highestGround = 1.7;
 
             for (let i = 0; i < colliders.length; i++) {
                 const box = colliders[i];
@@ -479,8 +521,7 @@ export default function FirstPersonMap({ onExit }) {
                     posZ <= box.max.z + playerRadius
                 ) {
                     const standableY = box.max.y + 1.7;
-                    // Si le joueur est au-dessus ou proche du sommet
-                    if (currentY >= standableY - 0.6) {
+                    if (currentY >= standableY - 0.7) {
                         if (standableY > highestGround) {
                             highestGround = standableY;
                         }
@@ -490,6 +531,11 @@ export default function FirstPersonMap({ onExit }) {
             return highestGround;
         };
 
+        // 14. Boucle de Rendu
+        let prevTime = performance.now();
+        let animId;
+        let walkCycle = 0;
+
         const animate = () => {
             animId = requestAnimationFrame(animate);
 
@@ -498,7 +544,7 @@ export default function FirstPersonMap({ onExit }) {
 
             // Drones flottants
             targetDrones.forEach((drone) => {
-                drone.position.y = drone.userData.initialY + Math.sin(time * 0.003 + drone.userData.offset) * 0.35;
+                drone.position.y = drone.userData.initialY + Math.sin(time * 0.003 + drone.userData.offset) * 0.4;
                 drone.userData.ring.rotation.x += 0.03;
                 drone.userData.ring.rotation.y += 0.04;
             });
@@ -528,10 +574,17 @@ export default function FirstPersonMap({ onExit }) {
             }
 
             if (controls.isLocked) {
-                // Frottements & Gravité
+                // Détection de la zone active
+                const px = camera.position.x;
+                const pz = camera.position.z;
+                if (px <= 0 && pz >= 0) setCurrentZoneName('HANGAR MILITAIRE');
+                else if (px <= 0 && pz < 0) setCurrentZoneName('PARCOURS & PLATEFORMES (PARKOUR)');
+                else if (px > 0 && pz < 0) setCurrentZoneName('LABORATOIRE BIO-TOXIQUE');
+                else setCurrentZoneName('ARÈNE / SURFACE LUNAIRE');
+
                 velocity.x -= velocity.x * 10.0 * delta;
                 velocity.z -= velocity.z * 10.0 * delta;
-                velocity.y -= 22.0 * delta; // Gravité
+                velocity.y -= 22.0 * delta;
 
                 direction.z = Number(moveState.forward) - Number(moveState.backward);
                 direction.x = Number(moveState.right) - Number(moveState.left);
@@ -543,25 +596,23 @@ export default function FirstPersonMap({ onExit }) {
                 if (moveState.forward || moveState.backward) velocity.z -= direction.z * baseSpeed * delta;
                 if (moveState.left || moveState.right) velocity.x -= direction.x * baseSpeed * delta;
 
-                // Application du mouvement avec résolution de collision pas-à-pas
+                // Application du mouvement avec collisions solides
                 const prevX = camera.position.x;
                 const prevZ = camera.position.z;
 
-                // 1. Déplacement latéral (X)
                 controls.moveRight(-velocity.x * delta);
                 if (checkCollision(camera.position.x, camera.position.z, camera.position.y)) {
                     camera.position.x = prevX;
                     velocity.x = 0;
                 }
 
-                // 2. Déplacement avant/arrière (Z)
                 controls.moveForward(-velocity.z * delta);
                 if (checkCollision(camera.position.x, camera.position.z, camera.position.y)) {
                     camera.position.z = prevZ;
                     velocity.z = 0;
                 }
 
-                // 3. Déplacement vertical & Hauteur du sol (Marche sur caisses / plateformes)
+                // Déplacement vertical & Atterrissage sur caisses/plateformes
                 camera.position.y += velocity.y * delta;
                 const currentGround = getGroundHeight(camera.position.x, camera.position.z, camera.position.y);
 
@@ -581,7 +632,6 @@ export default function FirstPersonMap({ onExit }) {
                     weaponGroup.position.y = THREE.MathUtils.lerp(weaponGroup.position.y, 0, 0.1);
                 }
 
-                // Limites extérieures absolues
                 camera.position.x = Math.max(-47, Math.min(47, camera.position.x));
                 camera.position.z = Math.max(-47, Math.min(47, camera.position.z));
             }
@@ -613,14 +663,13 @@ export default function FirstPersonMap({ onExit }) {
 
     return (
         <div className="relative w-full h-screen overflow-hidden bg-black select-none font-sans">
-            {/* 3D Canvas avec Post-Processing UnrealBloom & PBR */}
             <canvas
                 ref={canvasRef}
                 onClick={requestLock}
                 className="w-full h-full block cursor-crosshair"
             />
 
-            {/* Réticule de visée Sci-Fi */}
+            {/* Réticule de visée */}
             {isLocked && (
                 <div className="pointer-events-none fixed inset-0 flex items-center justify-center z-20">
                     <div className="relative w-7 h-7">
@@ -633,14 +682,14 @@ export default function FirstPersonMap({ onExit }) {
                 </div>
             )}
 
-            {/* HUD Supérieur Sci-Fi */}
-            <div className="pointer-events-none absolute top-4 left-6 z-20 flex items-center gap-4 font-mono text-xs sm:text-sm text-zinc-300">
+            {/* HUD Supérieur : Détection de Zone en Direct & Score */}
+            <div className="pointer-events-none absolute top-4 left-6 z-20 flex flex-wrap items-center gap-3 font-mono text-xs sm:text-sm text-zinc-300">
                 <div className="px-3.5 py-1.5 bg-slate-950/85 border border-emerald-500/40 rounded-xl backdrop-blur-md shadow-[0_0_20px_rgba(16,185,129,0.2)] flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span>ZONE 3D : <strong className="text-emerald-400 font-bold">STATION ALPHA (PBR + COLLISIONS ACTIVES)</strong></span>
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>ZONE ACTIVE : <strong className="text-emerald-400 font-bold">{currentZoneName}</strong></span>
                 </div>
                 <div className="px-3.5 py-1.5 bg-slate-950/85 border border-zinc-700 rounded-xl backdrop-blur-md">
-                    DRONES DÉTRUITS : <strong className="text-emerald-400 font-bold">{targetsHit}</strong> / {totalTargets}
+                    CIBLES : <strong className="text-emerald-400 font-bold">{targetsHit}</strong> / {totalTargets}
                 </div>
             </div>
 
@@ -656,33 +705,29 @@ export default function FirstPersonMap({ onExit }) {
 
             {/* Overlay d'accueil & Pause */}
             {!isLocked && (
-                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/75 backdrop-blur-md text-white pointer-events-auto">
-                    <div className="max-w-md w-full mx-4 p-8 bg-zinc-950/95 border border-emerald-500/30 rounded-2xl shadow-[0_0_60px_rgba(16,185,129,0.2)] text-center">
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/75 backdrop-blur-md text-white pointer-events-auto p-4">
+                    <div className="max-w-lg w-full p-8 bg-zinc-950/95 border border-emerald-500/30 rounded-2xl shadow-[0_0_60px_rgba(16,185,129,0.2)] text-center">
                         <div className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full text-xs font-mono font-bold tracking-widest uppercase mb-3">
-                            Moteur 3D • Éclairage Amélioré & Collisions
+                            4 Secteurs de Test • Collisions & Plateformes
                         </div>
                         <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-wider mb-2 text-white font-mono">
-                            Zone de Test Graphique
+                            Complexe d'Entraînement 3D
                         </h2>
                         <p className="text-xs text-zinc-400 mb-6">
-                            L'environnement est maintenant plus lumineux avec un système physique de collisions réelles (murs, piliers, caisses montables).
+                            Explorez 4 biomes distincts : <strong>Hangar</strong> (conteneurs), <strong>Parkour</strong> (plateformes montables), <strong>Labo Toxique</strong> (cuves de gaz) et <strong>Canyon Lunaire</strong> (monolithes).
                         </p>
 
                         <div className="space-y-2 mb-6 text-xs text-zinc-300 bg-zinc-900/80 p-4 rounded-xl border border-zinc-800 text-left font-mono">
-                            <div className="flex justify-between py-0.5">
-                                <span className="text-zinc-400">Regarder :</span>
-                                <strong className="text-zinc-200">Mouvement Souris (360°)</strong>
-                            </div>
                             <div className="flex justify-between py-0.5">
                                 <span className="text-zinc-400">Déplacement :</span>
                                 <strong className="text-zinc-200">Z, Q, S, D / Flèches</strong>
                             </div>
                             <div className="flex justify-between py-0.5">
-                                <span className="text-zinc-400">Sauter / Monter :</span>
-                                <strong className="text-zinc-200">Espace (grimpez sur les caisses)</strong>
+                                <span className="text-zinc-400">Saut & Parkour :</span>
+                                <strong className="text-emerald-400">Espace (grimpez de palier en palier)</strong>
                             </div>
                             <div className="flex justify-between py-0.5">
-                                <span className="text-zinc-400">Course (Sprint) :</span>
+                                <span className="text-zinc-400">Sprint :</span>
                                 <strong className="text-zinc-200">Maj (Shift)</strong>
                             </div>
                             <div className="flex justify-between py-0.5">
@@ -690,7 +735,7 @@ export default function FirstPersonMap({ onExit }) {
                                 <strong className="text-emerald-400">Clic Gauche (Étincelles)</strong>
                             </div>
                             <div className="flex justify-between py-0.5">
-                                <span className="text-zinc-400">Pause / Curseur :</span>
+                                <span className="text-zinc-400">Pause / Menu :</span>
                                 <strong className="text-zinc-200">Échap (ESC)</strong>
                             </div>
                         </div>
@@ -699,7 +744,7 @@ export default function FirstPersonMap({ onExit }) {
                             onClick={requestLock}
                             className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-zinc-950 font-black uppercase tracking-wider rounded-xl transition text-sm cursor-pointer shadow-lg shadow-emerald-500/30"
                         >
-                            ▶ Entrer dans la Zone 3D
+                            ▶ Entrer dans le Complexe 3D
                         </button>
                     </div>
                 </div>
