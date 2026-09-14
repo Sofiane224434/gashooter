@@ -8,10 +8,10 @@ export function setupMultiplayerServer(httpServer) {
     const rooms = new Map();
 
     const COLORS = [
-        { name: 'Cyan', hex: 0x06b6d4, spawn: [0, 1.7, 45] },
-        { name: 'Rouge', hex: 0xdc2626, spawn: [-45, 1.7, -35] },
-        { name: 'Violet', hex: 0x9333ea, spawn: [45, 1.7, -35] },
-        { name: 'Ambre', hex: 0xd97706, spawn: [0, 1.7, -50] }
+        { name: 'Cyan', hex: 0x06b6d4, spawn: [0, 1.7, 45] },      // Parc extérieur
+        { name: 'Rouge', hex: 0xdc2626, spawn: [-35, 1.7, -45] },  // Rue urbaine Ouest
+        { name: 'Violet', hex: 0x9333ea, spawn: [35, 1.7, -45] },   // Rue urbaine Est
+        { name: 'Ambre', hex: 0xd97706, spawn: [0, 1.7, -10] }     // Tunnel Métro (quai central)
     ];
 
     function getOrCreateRoom(roomId = 'global_arena') {

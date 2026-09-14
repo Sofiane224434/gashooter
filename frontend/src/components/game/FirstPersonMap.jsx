@@ -64,16 +64,16 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
 
         // --- 1. SCÈNE, CAMÉRA & RENDERER (BATTLEFIELD MILITARY ATMOSPHERE) ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x0e1726);
-        scene.fog = new THREE.FogExp2(0x0e1726, 0.006);
+        scene.background = new THREE.Color(0x1a2332);
+        scene.fog = new THREE.FogExp2(0x1a2332, 0.0035);
 
         const camera = new THREE.PerspectiveCamera(
             75,
             window.innerWidth / window.innerHeight,
             0.1,
-            600
+            800
         );
-        camera.position.set(0, 1.7, 45);
+        camera.position.set(0, 1.7, 80);
 
         const renderer = new THREE.WebGLRenderer({
             canvas: canvas,
@@ -104,177 +104,116 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
         const outputPass = new OutputPass();
         composer.addPass(outputPass);
 
-        // --- 3. ÉCLAIRAGE MILITAIRE HAUTE FIDÉLITÉ ---
-        const ambientLight = new THREE.AmbientLight(0xffffff, 2.2);
+        // --- 3. ÉCLAIRAGE MILITAIRE HAUTE FIDÉLITÉ (280x200m MAP) ---
+        const ambientLight = new THREE.AmbientLight(0xd4e0f0, 2.6);
         scene.add(ambientLight);
 
-        const sunLight = new THREE.DirectionalLight(0xffedd5, 3.6);
-        sunLight.position.set(50, 80, 60);
+        const sunLight = new THREE.DirectionalLight(0xffecd2, 4.0);
+        sunLight.position.set(80, 120, 90);
         sunLight.castShadow = true;
-        sunLight.shadow.mapSize.width = 2048;
-        sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.mapSize.width = 4096;
+        sunLight.shadow.mapSize.height = 4096;
         sunLight.shadow.camera.near = 0.5;
-        sunLight.shadow.camera.far = 280;
-        sunLight.shadow.camera.left = -90;
-        sunLight.shadow.camera.right = 90;
-        sunLight.shadow.camera.top = 90;
-        sunLight.shadow.camera.bottom = -90;
-        sunLight.shadow.bias = -0.0003;
+        sunLight.shadow.camera.far = 400;
+        sunLight.shadow.camera.left = -150;
+        sunLight.shadow.camera.right = 150;
+        sunLight.shadow.camera.top = 120;
+        sunLight.shadow.camera.bottom = -120;
+        sunLight.shadow.bias = -0.0002;
         scene.add(sunLight);
 
-        const skyFill = new THREE.DirectionalLight(0x38bdf8, 1.3);
-        skyFill.position.set(-60, 40, -60);
+        const skyFill = new THREE.DirectionalLight(0x7ec8e3, 1.6);
+        skyFill.position.set(-80, 60, -80);
         scene.add(skyFill);
 
-        // --- 4. MAP BATTLEFIELD ÉPIQUE : "OPÉRATION MÉTRO & CASPIAN SECTOR" (140x140m) ---
+        // Lumière tunnel métro (zone centrale froide)
+        const tunnelFill = new THREE.DirectionalLight(0x38bdf8, 0.8);
+        tunnelFill.position.set(0, 10, 0);
+        scene.add(tunnelFill);
+
+        // --- 4. MAP OPÉRATION MÉTRO (280x200m) — 3 ZONES IMMERSIVES ---
+        const MAP_W = 280, MAP_D = 200;
+        const ZONE_A_Z_MAX = 100;   // Parc extérieur : z = 30..100
+        const ZONE_B_Z_MIN = -30, ZONE_B_Z_MAX = 30; // Tunnel métro : z = -30..30
+        const ZONE_C_Z_MIN = -100;  // Rue urbaine : z = -100..-30
+
+        // Matériaux réalistes
+        const grassMat = new THREE.MeshStandardMaterial({ color: 0x2d5016, roughness: 0.85, metalness: 0.05 });
+        const dirtPathMat = new THREE.MeshStandardMaterial({ color: 0x5c4a32, roughness: 0.9, metalness: 0.05 });
         const asphaltMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7, metalness: 0.2 });
-        const concreteMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.6, metalness: 0.3 });
-        const metalPlateMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.35, metalness: 0.8 });
+        const concreteMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.6, metalness: 0.25 });
+        const concreteDarkMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.65, metalness: 0.3 });
+        const metalPlateMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.35, metalness: 0.8 });
+        const metalRustMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.7, metalness: 0.5 });
         const militaryOliveMat = new THREE.MeshStandardMaterial({ color: 0x1e3a1e, roughness: 0.5, metalness: 0.4 });
         const rustContainerMat = new THREE.MeshStandardMaterial({ color: 0x9a3412, roughness: 0.6, metalness: 0.4 });
         const blueContainerMat = new THREE.MeshStandardMaterial({ color: 0x0369a1, roughness: 0.5, metalness: 0.5 });
+        const greenContainerMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.55, metalness: 0.45 });
         const metroTrainMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4, metalness: 0.7 });
+        const metroTrainAccentMat = new THREE.MeshStandardMaterial({ color: 0x0ea5e9, roughness: 0.3, metalness: 0.6 });
         const yellowHazardMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
         const neonCyanMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
         const neonOrangeMat = new THREE.MeshBasicMaterial({ color: 0xf97316 });
+        const neonRedMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+        const brickMat = new THREE.MeshStandardMaterial({ color: 0x7c2d12, roughness: 0.75, metalness: 0.15 });
+        const brickLightMat = new THREE.MeshStandardMaterial({ color: 0xa3623a, roughness: 0.8, metalness: 0.1 });
+        const windowMat = new THREE.MeshStandardMaterial({ color: 0x172554, roughness: 0.1, metalness: 0.9 });
+        const tileFloorMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.5, metalness: 0.3 });
+        const railMat = new THREE.MeshStandardMaterial({ color: 0x52525b, roughness: 0.3, metalness: 0.9 });
+        const treeTrunkMat = new THREE.MeshStandardMaterial({ color: 0x3e2723, roughness: 0.9, metalness: 0.05 });
+        const treeLeafMat = new THREE.MeshStandardMaterial({ color: 0x1b5e20, roughness: 0.8, metalness: 0.05 });
+        const treeLeafDarkMat = new THREE.MeshStandardMaterial({ color: 0x0d3f14, roughness: 0.85, metalness: 0.05 });
+        const stoneMat = new THREE.MeshStandardMaterial({ color: 0x78716c, roughness: 0.7, metalness: 0.2 });
+        const lampMat = new THREE.MeshStandardMaterial({ color: 0x27272a, roughness: 0.3, metalness: 0.8 });
+        const carBodyMat = new THREE.MeshStandardMaterial({ color: 0x1c1917, roughness: 0.5, metalness: 0.6 });
+        const carBurntMat = new THREE.MeshStandardMaterial({ color: 0x292524, roughness: 0.8, metalness: 0.3 });
 
-        const colliders = [];
-        const colliderMeshes = [];
-        const registerBox = (mesh) => {
+        const colliders = [];      // Box3 array pour collision horizontale (murs) 
+        const colliderMeshes = [];  // meshes pour raycasting balles
+        const groundBoxes = [];    // Box3 pour détection de sol (sol + plateformes)
+        const registerBox = (mesh, isGround = false) => {
+            mesh.updateMatrixWorld(true);
+            const box = new THREE.Box3().setFromObject(mesh);
+            colliders.push(box);
+            colliderMeshes.push(mesh);
+            if (isGround) groundBoxes.push(box);
+            return box;
+        };
+        // Register un objet UNIQUEMENT comme mur (pas de ground)
+        const registerWall = (mesh) => {
             mesh.updateMatrixWorld(true);
             const box = new THREE.Box3().setFromObject(mesh);
             colliders.push(box);
             colliderMeshes.push(mesh);
             return box;
         };
+        // Register un sol walkable (ground seulement, pas de blocage horizontal)
+        const registerGround = (mesh) => {
+            mesh.updateMatrixWorld(true);
+            const box = new THREE.Box3().setFromObject(mesh);
+            groundBoxes.push(box);
+            colliderMeshes.push(mesh);
+            return box;
+        };
 
-        // Sol Principal Asphalt (140x140m)
-        const ground = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), asphaltMat);
-        ground.rotation.x = -Math.PI / 2;
-        ground.receiveShadow = true;
-        scene.add(ground);
-
-        // Murs d'Enceinte de la Carte (140x140m)
-        const wallH = 14;
         const addSolidWall = (x, y, z, w, h, d, mat = concreteMat) => {
             const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
             wall.position.set(x, y, z);
             wall.receiveShadow = true;
             wall.castShadow = true;
             scene.add(wall);
-            registerBox(wall);
+            registerBox(wall, false); // mur = collision horizontale
         };
-        addSolidWall(0, wallH / 2, -70, 140, wallH, 3);
-        addSolidWall(0, wallH / 2, 70, 140, wallH, 3);
-        addSolidWall(-70, wallH / 2, 0, 3, wallH, 140);
-        addSolidWall(70, wallH / 2, 0, 3, wallH, 140);
 
-        // SECTEUR CENTRAL : STATION DE MÉTRO & VOIE FERRÉE (OPÉRATION MÉTRO)
-        // 1. Quai de Métro Surélevé (Largeur 26m, Longueur 40m, Hauteur 2.8m)
         const addSolidPlatform = (x, y, z, w, h, d, mat = concreteMat) => {
             const platform = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
             platform.position.set(x, y + h / 2, z);
             platform.receiveShadow = true;
             platform.castShadow = true;
             scene.add(platform);
-            registerBox(platform);
+            registerBox(platform, true); // plateforme = collision horizontale + sol
+        };;
 
-            // Bandes d'alerte jaune sur les bords du quai
-            const stripLeft = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.05, d), yellowHazardMat);
-            stripLeft.position.set(x - w / 2 + 0.2, y + h + 0.02, z);
-            scene.add(stripLeft);
-
-            const stripRight = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.05, d), yellowHazardMat);
-            stripRight.position.set(x + w / 2 - 0.2, y + h + 0.02, z);
-            scene.add(stripRight);
-
-            // Rampes d'accès solides
-            const rampLen = 7.0;
-            const addRamp = (rx, rz, isFront) => {
-                const ramp = new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.6, rampLen), concreteMat);
-                ramp.position.set(rx, y + h / 2, rz);
-                ramp.rotation.x = isFront ? -Math.atan2(h, rampLen) : Math.atan2(h, rampLen);
-                ramp.castShadow = true;
-                ramp.receiveShadow = true;
-                scene.add(ramp);
-                registerBox(ramp);
-            };
-            addRamp(x - 6, z + d / 2 + rampLen / 2 - 0.3, true);
-            addRamp(x + 6, z + d / 2 + rampLen / 2 - 0.3, true);
-            addRamp(x - 6, z - d / 2 - rampLen / 2 + 0.3, false);
-            addRamp(x + 6, z - d / 2 - rampLen / 2 + 0.3, false);
-        };
-        addSolidPlatform(0, 0, 0, 24, 2.8, 36);
-
-        // 2. Rame de Métro Déserte (Wagon Métro Central de Combat)
-        const addMetroCar = (x, z) => {
-            const carGroup = new THREE.Group();
-            carGroup.position.set(x, 2.8, z);
-
-            // Toit du wagon
-            const roof = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.4, 18), metroTrainMat);
-            roof.position.y = 3.2;
-            roof.castShadow = true;
-            roof.receiveShadow = true;
-            carGroup.add(roof);
-            registerBox(roof);
-
-            // Parois latérales avec ouvertures de fenêtres/portes
-            const wallLeft = new THREE.Mesh(new THREE.BoxGeometry(0.3, 3.2, 18), metroTrainMat);
-            wallLeft.position.set(-2.25, 1.6, 0);
-            wallLeft.castShadow = true;
-            carGroup.add(wallLeft);
-            registerBox(wallLeft);
-
-            const wallRight = new THREE.Mesh(new THREE.BoxGeometry(0.3, 3.2, 18), metroTrainMat);
-            wallRight.position.set(2.25, 1.6, 0);
-            wallRight.castShadow = true;
-            carGroup.add(wallRight);
-            registerBox(wallRight);
-
-            // Panneau Enseigne Métro
-            const sign = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.5, 0.1), neonCyanMat);
-            sign.position.set(0, 3.4, 9.05);
-            carGroup.add(sign);
-
-            scene.add(carGroup);
-        };
-        addMetroCar(0, 0);
-
-        // 3. Piliers Structuraux en Béton Armé
-        const addConcretePillars = (x, z) => {
-            const pillar = new THREE.Mesh(new THREE.BoxGeometry(2.2, 9.0, 2.2), concreteMat);
-            pillar.position.set(x, 4.5, z);
-            pillar.castShadow = true;
-            pillar.receiveShadow = true;
-            scene.add(pillar);
-            registerBox(pillar);
-        };
-        addConcretePillars(-18, 12);
-        addConcretePillars(18, 12);
-        addConcretePillars(-18, -12);
-        addConcretePillars(18, -12);
-
-        // SECTEUR ALPHA : BASE CHECKPOINT MILITAIRE (SUD)
-        // Tour Radar de Télécommunication (Hauteur 11m)
-        const addRadarTower = (x, z) => {
-            addSolidPlatform(x, 0, z, 14, 6.5, 14, concreteMat);
-            // Rambardes solides
-            addSolidWall(x, 6.5 + 0.6, z - 6.5, 14, 1.2, 0.8, metalPlateMat);
-            addSolidWall(x, 6.5 + 0.6, z + 6.5, 14, 1.2, 0.8, metalPlateMat);
-            addSolidWall(x - 6.5, 6.5 + 0.6, z, 0.8, 1.2, 14, metalPlateMat);
-            addSolidWall(x + 6.5, 6.5 + 0.6, z, 0.8, 1.2, 14, metalPlateMat);
-
-            // Antenne Radar
-            const dish = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 0.3, 16), metalPlateMat);
-            dish.position.set(x, 6.5 + 4.5, z);
-            dish.rotation.x = Math.PI / 4;
-            scene.add(dish);
-        };
-        addRadarTower(-42, 42);
-        addRadarTower(42, -42);
-
-        // Conteneurs Maritimes Militaires Empilés
         const addShippingContainer = (x, y, z, rot = 0, mat = rustContainerMat) => {
             const cont = new THREE.Mesh(new THREE.BoxGeometry(3.2, 3.2, 7.5), mat);
             cont.position.set(x, y + 1.6, z);
@@ -282,20 +221,9 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             cont.castShadow = true;
             cont.receiveShadow = true;
             scene.add(cont);
-            registerBox(cont);
+            registerBox(cont, true); // on peut marcher dessus
         };
-        addShippingContainer(-30, 0, 22, 0, rustContainerMat);
-        addShippingContainer(-30, 3.2, 22, 0, blueContainerMat);
-        addShippingContainer(-24, 0, 26, Math.PI / 2, militaryOliveMat);
 
-        addShippingContainer(30, 0, -22, 0, blueContainerMat);
-        addShippingContainer(30, 3.2, -22, 0, rustContainerMat);
-        addShippingContainer(24, 0, -26, Math.PI / 2, militaryOliveMat);
-
-        addShippingContainer(-40, 0, -35, Math.PI / 4, rustContainerMat);
-        addShippingContainer(40, 0, 35, -Math.PI / 4, blueContainerMat);
-
-        // Barricades de Béton & Tranchées Jersey
         const addJerseyBarrier = (x, z, rot = 0) => {
             const b = new THREE.Mesh(new THREE.BoxGeometry(5.0, 1.4, 0.8), concreteMat);
             b.position.set(x, 0.7, z);
@@ -303,19 +231,547 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             b.castShadow = true;
             b.receiveShadow = true;
             scene.add(b);
-            registerBox(b);
+            registerBox(b, false); // barrière = mur seulement
+        };;
 
-            const neon = new THREE.Mesh(new THREE.BoxGeometry(5.0, 0.08, 0.85), neonOrangeMat);
-            neon.position.set(x, 1.42, z);
-            neon.rotation.y = rot;
-            scene.add(neon);
+        const addTree = (x, z, scale = 1.0) => {
+            // Tronc = mur (collision horizontale seulement, pas de ground)
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3 * scale, 0.4 * scale, 4.5 * scale, 6), treeTrunkMat);
+            trunk.position.set(x, 2.25 * scale, z);
+            trunk.castShadow = true;
+            scene.add(trunk);
+            registerWall(trunk); // seulement mur, pas sol
+            const leafMat = Math.random() > 0.5 ? treeLeafMat : treeLeafDarkMat;
+            // Couronnes = décor uniquement, PAS de collider (sinon on bloque partout)
+            const crown1 = new THREE.Mesh(new THREE.SphereGeometry(2.5 * scale, 6, 6), leafMat);
+            crown1.position.set(x, 5.5 * scale, z);
+            crown1.castShadow = true;
+            scene.add(crown1);
+            const crown2 = new THREE.Mesh(new THREE.SphereGeometry(1.8 * scale, 6, 6), leafMat);
+            crown2.position.set(x + 1.2 * scale, 6.2 * scale, z - 0.8 * scale);
+            scene.add(crown2);
         };
 
-        [
-            [-12, 24, 0], [12, 24, 0], [-12, -24, 0], [12, -24, 0],
-            [-35, 0, Math.PI / 2], [35, 0, Math.PI / 2],
-            [-45, 15, 0], [45, 15, 0], [-45, -15, 0], [45, -15, 0]
-        ].forEach(([bx, bz, brot]) => addJerseyBarrier(bx, bz, brot));
+        const addLampPost = (x, z) => {
+            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 5.5, 6), lampMat);
+            pole.position.set(x, 2.75, z);
+            scene.add(pole);
+            registerWall(pole);
+            const arm = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.08), lampMat);
+            arm.position.set(x + 0.6, 5.3, z);
+            scene.add(arm);
+            const lampHead = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.15, 0.3), new THREE.MeshBasicMaterial({ color: 0xfef3c7 }));
+            lampHead.position.set(x + 1.1, 5.2, z);
+            scene.add(lampHead);
+            // PAS de PointLight individuel (performance) - utiliser emissive
+        };
+
+        const addDestroyedCar = (x, z, rot = 0) => {
+            const carGroup = new THREE.Group();
+            carGroup.position.set(x, 0, z);
+            carGroup.rotation.y = rot;
+            const body = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.3, 4.5), carBodyMat);
+            body.position.set(0, 0.85, 0);
+            body.castShadow = true;
+            carGroup.add(body);
+            registerBox(body, true); // voiture = on peut marcher dessus
+            const roof = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.7, 2.5), carBurntMat);
+            roof.position.set(0, 1.85, -0.3);
+            carGroup.add(roof);
+            // Pas de registerBox pour roof (petite pièce décorative)
+            for (let wx = -1; wx <= 1; wx += 2) {
+                for (let wz = -1; wz <= 1; wz += 2) {
+                    const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.2, 8), metalPlateMat);
+                    wheel.position.set(wx * 1.0, 0.35, wz * 1.5);
+                    wheel.rotation.z = Math.PI / 2;
+                    carGroup.add(wheel);
+                }
+            }
+            scene.add(carGroup);
+        };
+
+        const addBuildingFacade = (x, z, w, h, d, mat = brickMat, floors = 3) => {
+            const building = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+            building.position.set(x, h / 2, z);
+            building.castShadow = true;
+            building.receiveShadow = true;
+            scene.add(building);
+            registerBox(building, false); // immeuble = mur seulement
+            // Fenêtres simplifiées (pas de boucle coûteuse)
+            const floorH = h / floors;
+            for (let f = 0; f < floors; f++) {
+                const windowsPerRow = Math.floor(w / 3.5);
+                for (let wi = 0; wi < windowsPerRow; wi++) {
+                    const wx = x - w / 2 + 2.0 + wi * 3.2;
+                    const wy = floorH * 0.5 + f * floorH + 0.5;
+                    const win = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.8), windowMat);
+                    win.position.set(wx, wy, z + d / 2 + 0.02);
+                    scene.add(win);
+                }
+            }
+            const roofEdge = new THREE.Mesh(new THREE.BoxGeometry(w + 0.5, 0.6, d + 0.5), concreteDarkMat);
+            roofEdge.position.set(x, h + 0.3, z);
+            scene.add(roofEdge);
+        };
+
+        // ===== SOL PRINCIPAL 280x200m =====
+        // Zone A (Parc) : herbe
+        const groundA = new THREE.Mesh(new THREE.PlaneGeometry(MAP_W, 70), grassMat);
+        groundA.rotation.x = -Math.PI / 2;
+        groundA.position.set(0, 0, 65);
+        groundA.receiveShadow = true;
+        scene.add(groundA);
+
+        // Zone B (Tunnel) : béton/carrelage
+        const groundB = new THREE.Mesh(new THREE.PlaneGeometry(MAP_W, 60), tileFloorMat);
+        groundB.rotation.x = -Math.PI / 2;
+        groundB.position.set(0, 0, 0);
+        groundB.receiveShadow = true;
+        scene.add(groundB);
+
+        // Zone C (Rue) : asphalte
+        const groundC = new THREE.Mesh(new THREE.PlaneGeometry(MAP_W, 70), asphaltMat);
+        groundC.rotation.x = -Math.PI / 2;
+        groundC.position.set(0, 0, -65);
+        groundC.receiveShadow = true;
+        scene.add(groundC);
+
+        // ===== MURS D'ENCEINTE 280x200m =====
+        const wallH = 16;
+        addSolidWall(0, wallH / 2, -MAP_D / 2, MAP_W, wallH, 3);     // SUD
+        addSolidWall(0, wallH / 2, MAP_D / 2, MAP_W, wallH, 3);      // NORD
+        addSolidWall(-MAP_W / 2, wallH / 2, 0, 3, wallH, MAP_D);     // OUEST
+        addSolidWall(MAP_W / 2, wallH / 2, 0, 3, wallH, MAP_D);      // EST
+
+        // =============================================
+        // ===== ZONE A : PARC EXTÉRIEUR (z = 30..100) =====
+        // =============================================
+
+        // Chemin central en terre à travers le parc
+        const parkPath = new THREE.Mesh(new THREE.PlaneGeometry(8, 65), dirtPathMat);
+        parkPath.rotation.x = -Math.PI / 2;
+        parkPath.position.set(0, 0.02, 62);
+        scene.add(parkPath);
+
+        // Rangées d'arbres le long du chemin
+        for (let i = 0; i < 10; i++) {
+            const zz = 35 + i * 6.5;
+            addTree(-6 - Math.random() * 4, zz, 0.85 + Math.random() * 0.35);
+            addTree(6 + Math.random() * 4, zz, 0.85 + Math.random() * 0.35);
+        }
+        // Arbres dispersés sur les côtés
+        for (let i = 0; i < 20; i++) {
+            const tx = (Math.random() - 0.5) * 240;
+            const tz = 35 + Math.random() * 58;
+            if (Math.abs(tx) > 15) addTree(tx, tz, 0.7 + Math.random() * 0.5);
+        }
+
+        // Fontaine centrale du parc
+        const fountainBase = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 5.0, 1.2, 16), stoneMat);
+        fountainBase.position.set(0, 0.6, 65);
+        scene.add(fountainBase);
+        registerBox(fountainBase, true);
+        const fountainPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 3.5, 8), stoneMat);
+        fountainPillar.position.set(0, 2.95, 65);
+        scene.add(fountainPillar);
+        registerWall(fountainPillar);
+        const fountainTop = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 1.8, 0.5, 12), stoneMat);
+        fountainTop.position.set(0, 4.45, 65);
+        scene.add(fountainTop);
+        // Eau simulée
+        const waterMat = new THREE.MeshStandardMaterial({ color: 0x155e75, roughness: 0.1, metalness: 0.8, transparent: true, opacity: 0.7 });
+        const water = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, 0.15, 24), waterMat);
+        water.position.set(0, 1.15, 65);
+        scene.add(water);
+
+        // Bancs de parc
+        const addBench = (bx, bz, rot = 0) => {
+            const seat = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.12, 0.6), treeTrunkMat);
+            seat.position.set(bx, 0.52, bz);
+            seat.rotation.y = rot;
+            seat.castShadow = true;
+            scene.add(seat);
+            registerBox(seat, false); // petit objet, mur seulement
+            const back = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.8, 0.1), treeTrunkMat);
+            back.position.set(bx, 0.95, bz - 0.25 * Math.cos(rot) + 0.25 * Math.sin(rot));
+            back.rotation.y = rot;
+            scene.add(back);
+        };
+        addBench(-14, 58); addBench(-14, 72); addBench(14, 58); addBench(14, 72);
+        addBench(-28, 65, Math.PI / 2); addBench(28, 65, -Math.PI / 2);
+
+        // Murets de parc (couverture tactique)
+        addSolidWall(-35, 0.7, 50, 12, 1.4, 0.8);
+        addSolidWall(35, 0.7, 50, 12, 1.4, 0.8);
+        addSolidWall(-50, 0.7, 70, 0.8, 1.4, 18);
+        addSolidWall(50, 0.7, 70, 0.8, 1.4, 18);
+        addSolidWall(-20, 0.7, 85, 16, 1.4, 0.8);
+        addSolidWall(20, 0.7, 85, 16, 1.4, 0.8);
+
+        // Grand escalier du parc vers le tunnel (zone A→B transition)
+        for (let step = 0; step < 8; step++) {
+            const stairBlock = new THREE.Mesh(new THREE.BoxGeometry(22, 0.35, 2.0), concreteMat);
+            stairBlock.position.set(0, step * 0.35 + 0.175, 30 - step * 1.8);
+            stairBlock.receiveShadow = true;
+            stairBlock.castShadow = true;
+            scene.add(stairBlock);
+            registerGround(stairBlock);
+        }
+        // Rampes latérales de l'escalier
+        addSolidWall(-12, 1.6, 22, 0.8, 3.2, 16, concreteDarkMat);
+        addSolidWall(12, 1.6, 22, 0.8, 3.2, 16, concreteDarkMat);
+
+        // Lampadaires du parc
+        addLampPost(-20, 45); addLampPost(20, 45);
+        addLampPost(-40, 65); addLampPost(40, 65);
+        addLampPost(-20, 85); addLampPost(20, 85);
+
+        // Kiosque / gazebo
+        addSolidPlatform(-60, 0, 70, 10, 0.4, 10, concreteMat);
+        const gazeboPillarPositions = [[-65, 70], [-55, 70], [-65, 75], [-55, 75], [-65, 65], [-55, 65]];
+        gazeboPillarPositions.forEach(([px, pz]) => {
+            const p = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 3.5, 8), stoneMat);
+            p.position.set(px, 2.15, pz);
+            scene.add(p);
+            registerWall(p);
+        });
+        const gazeboRoof = new THREE.Mesh(new THREE.BoxGeometry(12, 0.3, 12), concreteDarkMat);
+        gazeboRoof.position.set(-60, 3.95, 70);
+        scene.add(gazeboRoof);
+        registerBox(gazeboRoof, true);
+
+        // Statue / obélisque dans le parc
+        const obelisk = new THREE.Mesh(new THREE.BoxGeometry(1.5, 6.0, 1.5), stoneMat);
+        obelisk.position.set(60, 3.0, 70);
+        obelisk.castShadow = true;
+        scene.add(obelisk);
+        registerWall(obelisk);
+        const obeliskTop = new THREE.Mesh(new THREE.ConeGeometry(1.2, 2.0, 4), stoneMat);
+        obeliskTop.position.set(60, 7.0, 70);
+        obeliskTop.rotation.y = Math.PI / 4;
+        scene.add(obeliskTop);
+
+        // =============================================
+        // ===== ZONE B : TUNNEL DU MÉTRO (z = -30..30) =====
+        // =============================================
+
+        // Plafond du tunnel (toit béton massif)
+        const tunnelCeiling = new THREE.Mesh(new THREE.BoxGeometry(MAP_W - 10, 1.2, 56), concreteDarkMat);
+        tunnelCeiling.position.set(0, 9.0, 0);
+        tunnelCeiling.receiveShadow = true;
+        scene.add(tunnelCeiling);
+        registerBox(tunnelCeiling, false); // plafond = mur seulement
+
+        // Murs latéraux du tunnel (avec relief)
+        for (let side = -1; side <= 1; side += 2) {
+            const tunnelWall = new THREE.Mesh(new THREE.BoxGeometry(2.5, 9.0, 56), concreteDarkMat);
+            tunnelWall.position.set(side * (MAP_W / 2 - 6), 4.5, 0);
+            tunnelWall.castShadow = true;
+            scene.add(tunnelWall);
+            registerBox(tunnelWall, false);
+        }
+
+        // Quai de Métro Gauche (surélevé 1.2m)
+        addSolidPlatform(-40, 0, 0, 30, 1.2, 50, concreteMat);
+        // Bandes de sécurité jaunes
+        const stripL = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.06, 50), yellowHazardMat);
+        stripL.position.set(-25.2, 1.23, 0);
+        scene.add(stripL);
+
+        // Quai de Métro Droit (surélevé 1.2m)
+        addSolidPlatform(40, 0, 0, 30, 1.2, 50, concreteMat);
+        const stripR = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.06, 50), yellowHazardMat);
+        stripR.position.set(25.2, 1.23, 0);
+        scene.add(stripR);
+
+        // Rails de métro (2 voies)
+        for (let trackX = -15; trackX <= 15; trackX += 30) {
+            for (let rOff = -1.2; rOff <= 1.2; rOff += 2.4) {
+                const rail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.15, 54), railMat);
+                rail.position.set(trackX + rOff, 0.075, 0);
+                scene.add(rail);
+            }
+            // Traverses
+            for (let tz = -26; tz <= 26; tz += 2) {
+                const tie = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.12, 0.3), treeTrunkMat);
+                tie.position.set(trackX, 0.06, tz);
+                scene.add(tie);
+            }
+        }
+
+        // Rames de métro (wagons) - wagons traversables sur chaque voie
+        const addMetroCar = (x, z) => {
+            const carGroup = new THREE.Group();
+            carGroup.position.set(x, 0.15, z);
+            scene.add(carGroup);
+
+            // Plancher walkable
+            const floor = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.25, 16), metroTrainMat);
+            floor.position.y = 0.85;
+            floor.receiveShadow = true;
+            carGroup.add(floor);
+
+            // Toit
+            const roof = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.35, 16), metroTrainMat);
+            roof.position.y = 3.75;
+            roof.castShadow = true;
+            carGroup.add(roof);
+
+            // Parois latérales (portes ouvertes au centre : z de -2.2 à +2.2)
+            const walls = [];
+            for (let side = -1; side <= 1; side += 2) {
+                const wallFront = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.65, 5.2), metroTrainMat);
+                wallFront.position.set(side * 2.3, 2.3, 5.2);
+                wallFront.castShadow = true;
+                carGroup.add(wallFront);
+                walls.push(wallFront);
+
+                const wallBack = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.65, 5.2), metroTrainMat);
+                wallBack.position.set(side * 2.3, 2.3, -5.2);
+                wallBack.castShadow = true;
+                carGroup.add(wallBack);
+                walls.push(wallBack);
+
+                const accent = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.3, 16), metroTrainAccentMat);
+                accent.position.set(side * 2.31, 2.0, 0);
+                carGroup.add(accent);
+            }
+
+            // Extrémités du wagon
+            const wallEnd1 = new THREE.Mesh(new THREE.BoxGeometry(4.6, 2.65, 0.2), metroTrainMat);
+            wallEnd1.position.set(0, 2.3, 8.0);
+            carGroup.add(wallEnd1);
+            walls.push(wallEnd1);
+
+            const wallEnd2 = new THREE.Mesh(new THREE.BoxGeometry(4.6, 2.65, 0.2), metroTrainMat);
+            wallEnd2.position.set(0, 2.3, -8.0);
+            carGroup.add(wallEnd2);
+            walls.push(wallEnd2);
+
+            // Enseigne néon
+            const sign = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.45, 0.08), neonCyanMat);
+            sign.position.set(0, 4.0, 8.05);
+            carGroup.add(sign);
+
+            // Mise à jour de la hiérarchie dans la scène avant enregistrement des colliders
+            carGroup.updateMatrixWorld(true);
+
+            // Le plancher est un SOL (on peut marcher dessus et entrer par les portes)
+            registerGround(floor);
+            registerWall(roof);
+            walls.forEach(w => registerWall(w));
+        };
+        // Voie gauche
+        addMetroCar(-15, -12); addMetroCar(-15, 12);
+        // Voie droite
+        addMetroCar(15, -8); addMetroCar(15, 16);
+
+        // Piliers structuraux du tunnel (rangées)
+        for (let pz = -24; pz <= 24; pz += 12) {
+            for (let px = -70; px <= 70; px += 35) {
+                if (Math.abs(px) < 22) continue; // pas de pilier sur les voies
+                const pillar = new THREE.Mesh(new THREE.BoxGeometry(1.8, 8.5, 1.8), concreteMat);
+                pillar.position.set(px, 4.25, pz);
+                pillar.castShadow = true;
+                pillar.receiveShadow = true;
+                scene.add(pillar);
+                registerBox(pillar);
+            }
+        }
+
+        // Néons au plafond du tunnel (réduit - pas de PointLight individuel)
+        for (let nz = -22; nz <= 22; nz += 11) {
+            for (let nx = -80; nx <= 80; nx += 55) {
+                const neonBar = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.08, 0.15), neonCyanMat);
+                neonBar.position.set(nx, 8.35, nz);
+                scene.add(neonBar);
+            }
+        }
+        // Seulement 4 PointLights pour tout le tunnel (au lieu de 25+)
+        const tunnelLight1 = new THREE.PointLight(0x06b6d4, 2.0, 40);
+        tunnelLight1.position.set(-50, 8, 0);
+        scene.add(tunnelLight1);
+        const tunnelLight2 = new THREE.PointLight(0x06b6d4, 2.0, 40);
+        tunnelLight2.position.set(50, 8, 0);
+        scene.add(tunnelLight2);
+        const tunnelLight3 = new THREE.PointLight(0x06b6d4, 1.5, 40);
+        tunnelLight3.position.set(0, 8, -15);
+        scene.add(tunnelLight3);
+        const tunnelLight4 = new THREE.PointLight(0x06b6d4, 1.5, 40);
+        tunnelLight4.position.set(0, 8, 15);
+        scene.add(tunnelLight4);
+
+        // Panneaux de signalisation du métro
+        const addMetroSign = (sx, sz, text, mat = neonCyanMat) => {
+            const signMesh = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.8, 0.12), mat);
+            signMesh.position.set(sx, 6.5, sz);
+            scene.add(signMesh);
+            const bgMesh = new THREE.Mesh(new THREE.BoxGeometry(3.8, 1.0, 0.1), concreteDarkMat);
+            bgMesh.position.set(sx, 6.5, sz - 0.08);
+            scene.add(bgMesh);
+        };
+        addMetroSign(-40, -25, 'SORTIE ←');
+        addMetroSign(-40, 25, '→ QUAI A');
+        addMetroSign(40, -25, 'SORTIE →');
+        addMetroSign(40, 25, '← QUAI B');
+
+        // Barricades et couvertures dans le tunnel
+        addJerseyBarrier(-8, 10); addJerseyBarrier(8, 10);
+        addJerseyBarrier(-8, -10); addJerseyBarrier(8, -10);
+        addJerseyBarrier(0, 0, Math.PI / 2);
+        addJerseyBarrier(-60, 5); addJerseyBarrier(60, 5);
+        addJerseyBarrier(-60, -15); addJerseyBarrier(60, -15);
+
+        // Conteneurs dans le tunnel
+        addShippingContainer(-80, 0, 10, 0, militaryOliveMat);
+        addShippingContainer(-80, 3.2, 10, 0, blueContainerMat);
+        addShippingContainer(80, 0, -10, 0, rustContainerMat);
+        addShippingContainer(80, 3.2, -10, 0, greenContainerMat);
+
+        // Escaliers de sortie du tunnel (zone B→C transition)
+        for (let step = 0; step < 8; step++) {
+            const stairBlock = new THREE.Mesh(new THREE.BoxGeometry(18, 0.35, 2.0), concreteMat);
+            stairBlock.position.set(0, step * 0.35 + 0.175, -30 + step * 1.8);
+            stairBlock.receiveShadow = true;
+            stairBlock.castShadow = true;
+            scene.add(stairBlock);
+            registerGround(stairBlock);
+        }
+        addSolidWall(-10, 1.6, -22, 0.8, 3.2, 16, concreteDarkMat);
+        addSolidWall(10, 1.6, -22, 0.8, 3.2, 16, concreteDarkMat);
+
+        // =============================================
+        // ===== ZONE C : RUE URBAINE (z = -100..-30) =====
+        // =============================================
+
+        // Trottoirs surélevés
+        addSolidPlatform(-60, 0, -65, 100, 0.25, 65, concreteMat);
+        addSolidPlatform(60, 0, -65, 100, 0.25, 65, concreteMat);
+
+        // Route centrale (marquage)
+        const roadCenter = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 60), yellowHazardMat);
+        roadCenter.rotation.x = -Math.PI / 2;
+        roadCenter.position.set(0, 0.025, -65);
+        scene.add(roadCenter);
+        // Lignes latérales
+        for (let lx = -1; lx <= 1; lx += 2) {
+            const lane = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 60), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+            lane.rotation.x = -Math.PI / 2;
+            lane.position.set(lx * 8, 0.025, -65);
+            scene.add(lane);
+        }
+
+        // Immeubles côté ouest (5 bâtiments)
+        addBuildingFacade(-95, -45, 22, 14, 10, brickMat, 3);
+        addBuildingFacade(-95, -65, 22, 18, 10, brickLightMat, 4);
+        addBuildingFacade(-95, -85, 22, 12, 10, brickMat, 3);
+        addBuildingFacade(-75, -55, 14, 16, 10, concreteDarkMat, 4);
+        addBuildingFacade(-75, -80, 14, 10, 10, brickLightMat, 2);
+
+        // Immeubles côté est (5 bâtiments)
+        addBuildingFacade(95, -45, 22, 16, 10, brickLightMat, 4);
+        addBuildingFacade(95, -65, 22, 12, 10, brickMat, 3);
+        addBuildingFacade(95, -85, 22, 20, 10, concreteDarkMat, 5);
+        addBuildingFacade(75, -55, 14, 14, 10, brickMat, 3);
+        addBuildingFacade(75, -80, 14, 10, 10, brickLightMat, 2);
+
+        // Véhicules détruits dans la rue
+        addDestroyedCar(-5, -50, 0.15);
+        addDestroyedCar(12, -60, -0.3);
+        addDestroyedCar(-18, -72, Math.PI / 2 + 0.2);
+        addDestroyedCar(25, -80, 0.1);
+        addDestroyedCar(-30, -55, Math.PI / 4);
+        addDestroyedCar(0, -90, -0.1);
+
+        // Barricades dans la rue
+        addJerseyBarrier(-15, -45); addJerseyBarrier(15, -45);
+        addJerseyBarrier(-25, -65, Math.PI / 4); addJerseyBarrier(25, -65, -Math.PI / 4);
+        addJerseyBarrier(0, -75, Math.PI / 2);
+        addJerseyBarrier(-40, -55); addJerseyBarrier(40, -55);
+        addJerseyBarrier(-15, -85); addJerseyBarrier(15, -85);
+
+        // Conteneurs dans la rue
+        addShippingContainer(-50, 0, -50, 0, rustContainerMat);
+        addShippingContainer(-50, 3.2, -50, 0, blueContainerMat);
+        addShippingContainer(50, 0, -70, Math.PI / 2, militaryOliveMat);
+        addShippingContainer(50, 0, -90, 0, greenContainerMat);
+        addShippingContainer(50, 3.2, -90, 0, rustContainerMat);
+
+        // Lampadaires de la rue
+        addLampPost(-12, -42); addLampPost(12, -42);
+        addLampPost(-12, -60); addLampPost(12, -60);
+        addLampPost(-12, -78); addLampPost(12, -78);
+        addLampPost(-35, -55); addLampPost(35, -55);
+
+        // Débris et ruines (petits éléments de couverture)
+        for (let i = 0; i < 12; i++) {
+            const dx = (Math.random() - 0.5) * 60;
+            const dz = -35 - Math.random() * 60;
+            const debris = new THREE.Mesh(
+                new THREE.BoxGeometry(1.0 + Math.random() * 2, 0.5 + Math.random() * 1.0, 1.0 + Math.random() * 2),
+                Math.random() > 0.5 ? concreteMat : brickMat
+            );
+            debris.position.set(dx, (0.5 + Math.random() * 1.0) / 2, dz);
+            debris.rotation.y = Math.random() * Math.PI;
+            debris.castShadow = true;
+            scene.add(debris);
+            registerBox(debris, false); // débris = mur seulement
+        }
+
+        // Sacs de sable (couverture tactique)
+        const addSandbagWall = (sx, sz, sRot = 0) => {
+            for (let row = 0; row < 3; row++) {
+                for (let col = -1; col <= 1; col++) {
+                    const bag = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.4, 0.6), militaryOliveMat);
+                    bag.position.set(
+                        sx + col * 1.15 * Math.cos(sRot),
+                        0.2 + row * 0.38,
+                        sz + col * 1.15 * Math.sin(sRot)
+                    );
+                    bag.rotation.y = sRot;
+                    bag.castShadow = true;
+                    scene.add(bag);
+                    if (row === 0) registerWall(bag);
+                }
+            }
+            const topBag = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.4, 0.6), militaryOliveMat);
+            topBag.position.set(sx, 0.2 + 3 * 0.38, sz);
+            topBag.rotation.y = sRot;
+            scene.add(topBag);
+            registerWall(topBag);
+        };
+        addSandbagWall(-30, -48); addSandbagWall(30, -48);
+        addSandbagWall(-45, -70, Math.PI / 2); addSandbagWall(45, -70, Math.PI / 2);
+        addSandbagWall(0, -60);
+
+        // Tour de guet / point d'observation surélevé
+        addSolidPlatform(60, 0, -50, 8, 5.0, 8, concreteDarkMat);
+        addSolidWall(60, 5.6, -54, 8, 1.2, 0.6, metalPlateMat);
+        addSolidWall(60, 5.6, -46, 8, 1.2, 0.6, metalPlateMat);
+        addSolidWall(56, 5.6, -50, 0.6, 1.2, 8, metalPlateMat);
+        addSolidWall(64, 5.6, -50, 0.6, 1.2, 8, metalPlateMat);
+        // Escalier vers la tour
+        for (let ts = 0; ts < 12; ts++) {
+            const tStep = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.35, 1.0), metalPlateMat);
+            tStep.position.set(56.5, ts * 0.42 + 0.21, -50 + ts * 0.6 - 3);
+            tStep.castShadow = true;
+            scene.add(tStep);
+            registerGround(tStep);
+        }
+
+        // Tour de guet symétrique côté ouest
+        addSolidPlatform(-60, 0, -80, 8, 5.0, 8, concreteDarkMat);
+        addSolidWall(-60, 5.6, -84, 8, 1.2, 0.6, metalPlateMat);
+        addSolidWall(-60, 5.6, -76, 8, 1.2, 0.6, metalPlateMat);
+        addSolidWall(-64, 5.6, -80, 0.6, 1.2, 8, metalPlateMat);
+        addSolidWall(-56, 5.6, -80, 0.6, 1.2, 8, metalPlateMat);
+        for (let ts = 0; ts < 12; ts++) {
+            const tStep = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.35, 1.0), metalPlateMat);
+            tStep.position.set(-56.5, ts * 0.42 + 0.21, -80 + ts * 0.6 - 3);
+            tStep.castShadow = true;
+            scene.add(tStep);
+            registerGround(tStep);
+        }
 
         // --- 5. MODÈLE DE JOUEUR ADVERSE ---
         const remotePlayersMap = new Map();
@@ -598,8 +1054,10 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
         const iconGlowMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
 
         const crateLocations = [
-            [-20, 0, 20], [20, 0, 20], [-20, 0, -20], [20, 0, -20],
-            [0, 2.8, 0], [-42, 6.5, 42], [42, 6.5, -42], [0, 0, 40]
+            [-30, 0, 60], [30, 0, 60], [0, 0, 80],
+            [-40, 1.2, 0], [40, 1.2, 0], [0, 0, 15], [0, 0, -15],
+            [-30, 0, -55], [30, 0, -55], [0, 0, -80],
+            [60, 5.0, -50], [-60, 5.0, -80]
         ];
         crateLocations.forEach(([x, y, z]) => {
             const crateGroup = new THREE.Group();
@@ -624,7 +1082,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             crateGroup.userData = { isCrate: true, available: true, baseY: y, iconGroup, respawnTimer: 0, radius: 2.0 };
             scene.add(crateGroup);
             ammoCrates.push(crateGroup);
-            registerBox(box);
+            registerBox(box, false); // crate = mur seulement
         });
 
         // --- 8. ARME DU JOUEUR LOCAL : AR-47 & AWP-50 SNIPER ---
@@ -872,31 +1330,15 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                     const shouldSprint = autoSprintRef.current || moveState.sprint;
 
                     if (isMoving && shouldSprint && canJump && !sliding && slideCooldown <= 0) {
-                        const forward = new THREE.Vector3();
-                        camera.getWorldDirection(forward);
-                        forward.y = 0;
-                        forward.normalize();
-
-                        const right = new THREE.Vector3();
-                        right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
-
-                        const slideDir = new THREE.Vector3();
-                        if (moveState.forward) slideDir.add(forward);
-                        if (moveState.backward) slideDir.sub(forward);
-                        if (moveState.right) slideDir.add(right);
-                        if (moveState.left) slideDir.sub(right);
-
-                        if (slideDir.lengthSq() < 0.01) slideDir.copy(forward);
-                        slideDir.normalize();
-
                         sliding = true;
                         slideTimer = 0.65;
                         slideCooldown = 1.3;
-                        setIsSliding(true);
                         sound.playSlide();
 
-                        velocity.x = slideDir.x * 18.0;
-                        velocity.z = slideDir.z * 18.0;
+                        // En PointerLockControls, velocity.z correspond à l'axe avant/arrière de la caméra
+                        // 18.0 vers l'avant garantit une glissade droite et ultra réactive
+                        velocity.z = 18.0;
+                        velocity.x = 0;
                     }
                     break;
 
@@ -949,7 +1391,6 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 case 'ControlRight':
                     moveState.crouch = false;
                     sliding = false;
-                    setIsSliding(false);
                     break;
             }
         };
@@ -1079,6 +1520,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
         let lastSyncTime = 0;
         let bobTimer = 0;
         let animationFrameId;
+        const bulletRay = new THREE.Raycaster();
 
         const animate = () => {
             animationFrameId = requestAnimationFrame(animate);
@@ -1142,7 +1584,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 activeGunGroup.rotation.z = 0;
             }
 
-            if (controls.isLocked && time - lastSyncTime > 40 && !isDead) {
+            if (controls.isLocked && time - lastSyncTime > 55 && !isDead) {
                 lastSyncTime = time;
                 const camRotY = camera.rotation.y;
                 mpClient.sendMove(camera.position, camRotY, camera.rotation.x, isAimingADS);
@@ -1193,8 +1635,13 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 b.mesh.position.addScaledVector(b.dir, stepDist);
                 b.distTravelled += stepDist;
 
-                const stepRay = new THREE.Raycaster(oldPos, b.dir, 0, stepDist + 0.5);
-                const intersects = stepRay.intersectObjects(scene.children, true);
+                bulletRay.set(oldPos, b.dir);
+                bulletRay.near = 0;
+                bulletRay.far = stepDist + 0.5;
+
+                // Optimisation performance multi : cibler uniquement les colliders et les joueurs distants
+                const bulletTargets = [...colliderMeshes, ...Array.from(remotePlayersMap.values())];
+                const intersects = bulletRay.intersectObjects(bulletTargets, true);
 
                 let collided = false;
                 if (intersects.length > 0) {
@@ -1238,15 +1685,15 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 }
             }
 
-            // DÉPLACEMENT DU JOUEUR LOCAL SANS AUCUN PASS-THROUGH
+            // DÉPLACEMENT DU JOUEUR LOCAL — BOX3 COLLISION OPTIMISÉE
             if (controls.isLocked && !isDead) {
                 if (sliding) {
                     slideTimer -= delta;
-                    velocity.x -= velocity.x * 3.0 * delta;
-                    velocity.z -= velocity.z * 3.0 * delta;
+                    // Décélération plus douce pour la glissade
+                    velocity.x *= (1.0 - 2.5 * delta);
+                    velocity.z *= (1.0 - 2.5 * delta);
                     if (slideTimer <= 0) {
                         sliding = false;
-                        setIsSliding(false);
                     }
                 } else {
                     velocity.x -= velocity.x * 10.0 * delta;
@@ -1284,67 +1731,100 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                     footstepTimer = 0.2;
                 }
 
-                // Collisions Horizontales X
+                // ===== COLLISION HORIZONTALE (MURS) — Box3 avec marge réduite =====
+                const PLAYER_R = 0.35; // rayon joueur réduit (0.45 était trop large)
+
                 const oldX = camera.position.x;
                 controls.moveRight(velocity.x * delta);
-                const playerBoxX = new THREE.Box3(
-                    new THREE.Vector3(camera.position.x - 0.45, camera.position.y - (currentEyeHeight - 0.2), camera.position.z - 0.45),
-                    new THREE.Vector3(camera.position.x + 0.45, camera.position.y + 0.3, camera.position.z + 0.45)
-                );
                 for (const col of colliders) {
-                    if (playerBoxX.intersectsBox(col)) {
-                        camera.position.x = oldX;
-                        velocity.x = 0;
-                        break;
+                    if (
+                        camera.position.x + PLAYER_R > col.min.x &&
+                        camera.position.x - PLAYER_R < col.max.x &&
+                        camera.position.z + PLAYER_R > col.min.z &&
+                        camera.position.z - PLAYER_R < col.max.z
+                    ) {
+                        const feetY = camera.position.y - currentEyeHeight;
+                        const headY = camera.position.y + 0.3;
+                        // Ne pas bloquer si c'est une petite marche/trottoir franchissable (<= 0.42m)
+                        const isStepObstacle = (col.max.y - feetY <= 0.42);
+                        if (!isStepObstacle && feetY < col.max.y - 0.25 && headY > col.min.y + 0.1) {
+                            camera.position.x = oldX;
+                            velocity.x = 0;
+                            break;
+                        }
                     }
                 }
 
-                // Collisions Horizontales Z
                 const oldZ = camera.position.z;
                 controls.moveForward(velocity.z * delta);
-                const playerBoxZ = new THREE.Box3(
-                    new THREE.Vector3(camera.position.x - 0.45, camera.position.y - (currentEyeHeight - 0.2), camera.position.z - 0.45),
-                    new THREE.Vector3(camera.position.x + 0.45, camera.position.y + 0.3, camera.position.z + 0.45)
-                );
                 for (const col of colliders) {
-                    if (playerBoxZ.intersectsBox(col)) {
-                        camera.position.z = oldZ;
-                        velocity.z = 0;
-                        break;
+                    if (
+                        camera.position.x + PLAYER_R > col.min.x &&
+                        camera.position.x - PLAYER_R < col.max.x &&
+                        camera.position.z + PLAYER_R > col.min.z &&
+                        camera.position.z - PLAYER_R < col.max.z
+                    ) {
+                        const feetY = camera.position.y - currentEyeHeight;
+                        const headY = camera.position.y + 0.3;
+                        const isStepObstacle = (col.max.y - feetY <= 0.42);
+                        if (!isStepObstacle && feetY < col.max.y - 0.25 && headY > col.min.y + 0.1) {
+                            camera.position.z = oldZ;
+                            velocity.z = 0;
+                            break;
+                        }
                     }
                 }
 
                 const targetEye = sliding ? 0.85 : moveState.crouch ? 0.95 : normalEyeHeight;
                 currentEyeHeight = THREE.MathUtils.lerp(currentEyeHeight, targetEye, delta * 12);
 
-                // DÉTECTION DU SOL & ANTI-CLIPPING VERTICAL
+                // ===== DÉTECTION DU SOL — Box3 RAPIDE (pas de Raycaster) =====
                 const wasAirborne = !canJump;
                 camera.position.y += velocity.y * delta;
-                let groundY = currentEyeHeight;
 
-                for (const col of colliders) {
+                const playerX = camera.position.x;
+                const playerZ = camera.position.z;
+                const feetY = camera.position.y - currentEyeHeight;
+                let groundY = 0; // sol de base y=0
+
+                for (const col of groundBoxes) {
+                    // Vérifier si le joueur est dans l'emprise XZ de la surface
                     if (
-                        camera.position.x >= col.min.x - 0.45 &&
-                        camera.position.x <= col.max.x + 0.45 &&
-                        camera.position.z >= col.min.z - 0.45 &&
-                        camera.position.z <= col.max.z + 0.45
+                        playerX >= col.min.x - PLAYER_R &&
+                        playerX <= col.max.x + PLAYER_R &&
+                        playerZ >= col.min.z - PLAYER_R &&
+                        playerZ <= col.max.z + PLAYER_R
                     ) {
-                        const topY = col.max.y + currentEyeHeight;
-                        // On ne monte que si les pieds sont à la hauteur de la surface supérieure
-                        if (camera.position.y >= topY - 0.45 && topY >= groundY) {
-                            groundY = topY;
-                        }
-
-                        // Anti-traversée par le bas (plafond sous plateforme)
-                        if (velocity.y > 0 && camera.position.y >= col.min.y - 0.1 && camera.position.y <= col.max.y) {
-                            camera.position.y = col.min.y - 0.1;
-                            velocity.y = 0;
+                        const surfaceTop = col.max.y;
+                        // Accepter cette surface si les pieds sont au-dessus ou proche du sommet (step-up jusqu'à 0.55m)
+                        if (feetY >= surfaceTop - 0.55 && surfaceTop > groundY && surfaceTop - groundY < 8.0) {
+                            groundY = surfaceTop;
                         }
                     }
                 }
 
-                if (camera.position.y <= groundY) {
-                    camera.position.y = groundY;
+                const targetY = groundY + currentEyeHeight;
+
+                // Anti-traversée de plafond
+                if (velocity.y > 0) {
+                    for (const col of colliders) {
+                        if (
+                            playerX >= col.min.x - PLAYER_R &&
+                            playerX <= col.max.x + PLAYER_R &&
+                            playerZ >= col.min.z - PLAYER_R &&
+                            playerZ <= col.max.z + PLAYER_R &&
+                            camera.position.y + 0.3 >= col.min.y &&
+                            camera.position.y < col.min.y + 1.5
+                        ) {
+                            camera.position.y = col.min.y - 0.35;
+                            velocity.y = 0;
+                            break;
+                        }
+                    }
+                }
+
+                if (camera.position.y <= targetY) {
+                    camera.position.y = targetY;
                     if (wasAirborne && velocity.y < -4.0) {
                         sound.playLand();
                     }
@@ -1673,10 +2153,10 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                         </div>
                         <div>
                             <h2 className="text-2xl font-black text-white tracking-wide uppercase">
-                                Opération Métro • Caspian Sector (140x140m)
+                                Opération Métro (280x200m)
                             </h2>
                             <p className="text-xs text-slate-400 mt-2">
-                                {networkStatus} • Carte Battlefield avec Quai de Métro, Wagon de Combat & Base Militaire !
+                                {networkStatus} • Parc Extérieur → Tunnel Métro → Rue Urbaine
                             </p>
                         </div>
 
