@@ -12,6 +12,7 @@ export default function FirstPersonMap({ onExit }) {
     onExitRef.current = onExit;
 
     const [isLocked, setIsLocked] = useState(false);
+    const [isAiming, setIsAiming] = useState(false);
     const [score, setScore] = useState(0);
     const [shotsFired, setShotsFired] = useState(0);
     const [shotsHit, setShotsHit] = useState(0);
@@ -54,9 +55,9 @@ export default function FirstPersonMap({ onExit }) {
 
         const bloomPass = new UnrealBloomPass(
             new THREE.Vector2(window.innerWidth, window.innerHeight),
-            0.35, // Force
-            0.4,  // Rayon
-            0.8   // Seuil
+            0.35,
+            0.4,
+            0.8
         );
         composer.addPass(bloomPass);
 
@@ -131,7 +132,7 @@ export default function FirstPersonMap({ onExit }) {
         floor.receiveShadow = true;
         scene.add(floor);
 
-        // Murs d'enceinte (Arena Bounds)
+        // Murs d'enceinte
         const wallH = 10;
         const addWall = (x, y, z, w, h, d) => {
             const geo = new THREE.BoxGeometry(w, h, d);
@@ -160,7 +161,7 @@ export default function FirstPersonMap({ onExit }) {
         addGroundStrip(-15, 0, 0.2, 30);
         addGroundStrip(15, 0, 0.2, 30);
 
-        // Piliers / Colonnes tactiques avec bandes néon
+        // Piliers avec bandes néon
         const addPillar = (x, z) => {
             const group = new THREE.Group();
             group.position.set(x, 0, z);
@@ -185,7 +186,7 @@ export default function FirstPersonMap({ onExit }) {
         addPillar(-12, 12);
         addPillar(12, 12);
 
-        // Plateformes d'élévation surélevées
+        // Plateformes surélevées
         const addPlatform = (x, y, z, w, h, d) => {
             const geo = new THREE.BoxGeometry(w, h, d);
             const mesh = new THREE.Mesh(geo, platformMat);
@@ -195,7 +196,6 @@ export default function FirstPersonMap({ onExit }) {
             scene.add(mesh);
             registerBox(mesh);
 
-            // Rampe d'accès
             const rampGeo = new THREE.BoxGeometry(w, 0.4, 4);
             const ramp = new THREE.Mesh(rampGeo, platformMat);
             ramp.position.set(x, (y + h) / 2, z + d / 2 + 1.8);
@@ -228,7 +228,6 @@ export default function FirstPersonMap({ onExit }) {
             const group = new THREE.Group();
             group.position.set(pos[0], pos[1], pos[2]);
 
-            // Cœur de cible lumineux
             const coreGeo = new THREE.SphereGeometry(0.5, 24, 24);
             const coreMat = new THREE.MeshStandardMaterial({
                 color: 0xef4444,
@@ -241,7 +240,6 @@ export default function FirstPersonMap({ onExit }) {
             core.castShadow = true;
             group.add(core);
 
-            // Anneau orbital
             const ringGeo = new THREE.TorusGeometry(0.85, 0.05, 16, 32);
             const ringMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
             const ring = new THREE.Mesh(ringGeo, ringMat);
@@ -261,7 +259,8 @@ export default function FirstPersonMap({ onExit }) {
         });
 
         // --- 7. ARME TACTIQUE PREMIÈRE PERSONNE ---
-        const weaponGroup = new THREE.Group();
+        const weaponPivot = new THREE.Group();
+        const weaponMeshGroup = new THREE.Group();
 
         const gunMetalMat = new THREE.MeshStandardMaterial({ color: 0x18181b, metalness: 0.85, roughness: 0.3 });
         const gunSteelMat = new THREE.MeshStandardMaterial({ color: 0x3f3f46, metalness: 0.9, roughness: 0.2 });
@@ -271,49 +270,55 @@ export default function FirstPersonMap({ onExit }) {
         const body = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.14, 0.6), gunMetalMat);
         body.position.set(0.24, -0.22, -0.45);
         body.castShadow = true;
-        weaponGroup.add(body);
+        weaponMeshGroup.add(body);
 
         // Canon
         const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 16), gunSteelMat);
         barrel.rotation.x = Math.PI / 2;
         barrel.position.set(0.24, -0.18, -0.8);
-        weaponGroup.add(barrel);
+        weaponMeshGroup.add(barrel);
 
         // Frein de bouche
         const muzzle = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.08), gunSteelMat);
         muzzle.position.set(0.24, -0.18, -1.06);
-        weaponGroup.add(muzzle);
+        weaponMeshGroup.add(muzzle);
 
         // Chargeur
         const mag = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.24, 0.12), gunSteelMat);
         mag.position.set(0.24, -0.36, -0.42);
         mag.rotation.x = Math.PI / 12;
-        weaponGroup.add(mag);
+        weaponMeshGroup.add(mag);
 
         // Poignée
         const grip = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.22, 0.1), gunMetalMat);
         grip.position.set(0.24, -0.34, -0.26);
         grip.rotation.x = -Math.PI / 6;
-        weaponGroup.add(grip);
+        weaponMeshGroup.add(grip);
 
-        // Viseur Point Rouge
+        // Viseur Point Rouge (Holographic Red Dot)
         const sightBase = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.05, 0.14), gunMetalMat);
         sightBase.position.set(0.24, -0.12, -0.45);
-        weaponGroup.add(sightBase);
+        weaponMeshGroup.add(sightBase);
 
         const sightDot = new THREE.Mesh(new THREE.RingGeometry(0.012, 0.024, 16), gunSightMat);
         sightDot.position.set(0.24, -0.095, -0.5);
-        weaponGroup.add(sightDot);
-
-        camera.add(weaponGroup);
-        scene.add(camera);
+        weaponMeshGroup.add(sightDot);
 
         // Muzzle flash lumineux
         const flashLight = new THREE.PointLight(0xffedd5, 0, 6);
         flashLight.position.set(0.24, -0.18, -1.1);
-        weaponGroup.add(flashLight);
+        weaponMeshGroup.add(flashLight);
 
-        // --- 8. AUDIO SYNTHÉTISÉ PROPRE ---
+        weaponPivot.add(weaponMeshGroup);
+        camera.add(weaponPivot);
+        scene.add(camera);
+
+        // Positions cibles pour le Tir au jugé (Hip-fire) vs Visée épaulée (ADS)
+        const hipPosition = new THREE.Vector3(0, 0, 0);
+        const adsPosition = new THREE.Vector3(-0.24, 0.095, 0.08); // Centre le réticule rouge pile sur la ligne de visée
+        let isAimingADS = false;
+
+        // --- 8. AUDIO SYNTHÉTISÉ ---
         let audioCtx = null;
         const playShotSound = () => {
             try {
@@ -372,6 +377,8 @@ export default function FirstPersonMap({ onExit }) {
         };
         const onUnlock = () => {
             setIsLocked(false);
+            isAimingADS = false;
+            setIsAiming(false);
             setActiveMessage('Pause - Cliquez pour reprendre le contrôle');
         };
         controls.addEventListener('lock', onLock);
@@ -478,13 +485,15 @@ export default function FirstPersonMap({ onExit }) {
             playShotSound();
 
             // Recul de l'arme
-            weaponGroup.position.z += 0.12;
-            weaponGroup.rotation.x += 0.08;
+            const recoilAmount = isAimingADS ? 0.06 : 0.12;
+            const recoilRot = isAimingADS ? 0.04 : 0.08;
+            weaponMeshGroup.position.z += recoilAmount;
+            weaponMeshGroup.rotation.x += recoilRot;
             flashLight.intensity = 5;
 
             setTimeout(() => {
-                weaponGroup.position.z = 0;
-                weaponGroup.rotation.x = 0;
+                weaponMeshGroup.position.z = 0;
+                weaponMeshGroup.rotation.x = 0;
                 flashLight.intensity = 0;
             }, 60);
 
@@ -496,7 +505,6 @@ export default function FirstPersonMap({ onExit }) {
                 const hit = intersects[0];
                 createSparks(hit.point);
 
-                // Vérifier si une cible est touchée
                 let obj = hit.object;
                 while (obj.parent && !obj.userData?.isTarget && obj.parent !== scene) {
                     obj = obj.parent;
@@ -510,7 +518,6 @@ export default function FirstPersonMap({ onExit }) {
                     obj.userData.core.material.emissive.setHex(0xffffff);
                     obj.userData.core.material.color.setHex(0xffffff);
 
-                    // Repositionnement dynamique de la cible
                     setTimeout(() => {
                         obj.position.x = (Math.random() - 0.5) * 44;
                         obj.position.z = -10 - Math.random() * 16;
@@ -521,10 +528,31 @@ export default function FirstPersonMap({ onExit }) {
             }
         };
 
+        // Gestion Souris : Clic Gauche = Tir, Clic Droit = Visée (ADS)
         const onMouseDown = (e) => {
-            if (e.button === 0) fireWeapon();
+            if (!controls.isLocked) return;
+            if (e.button === 0) {
+                fireWeapon();
+            } else if (e.button === 2) {
+                isAimingADS = true;
+                setIsAiming(true);
+            }
         };
+
+        const onMouseUp = (e) => {
+            if (e.button === 2) {
+                isAimingADS = false;
+                setIsAiming(false);
+            }
+        };
+
+        const onContextMenu = (e) => {
+            e.preventDefault(); // Empêcher le menu contextuel du clic droit
+        };
+
         window.addEventListener('mousedown', onMouseDown);
+        window.addEventListener('mouseup', onMouseUp);
+        window.addEventListener('contextmenu', onContextMenu);
 
         // --- 11. BOUCLE PRINCIPALE & PHYSIQUE FLUIDE ---
         let prevTime = performance.now();
@@ -561,9 +589,11 @@ export default function FirstPersonMap({ onExit }) {
                 // Frottement & Amortissement
                 velocity.x -= velocity.x * 10.0 * delta;
                 velocity.z -= velocity.z * 10.0 * delta;
-                velocity.y -= 22.0 * delta; // Gravité constante
+                velocity.y -= 22.0 * delta;
 
-                const speed = moveState.sprint ? 14.0 : 8.5;
+                // Vitesse ralentie si en cours de visée (ADS)
+                const baseSpeed = moveState.sprint ? 14.0 : 8.5;
+                const speed = isAimingADS ? baseSpeed * 0.55 : baseSpeed;
                 const dir = new THREE.Vector3();
 
                 if (moveState.forward) dir.z += 1;
@@ -608,13 +638,7 @@ export default function FirstPersonMap({ onExit }) {
                 // Test de gravité en Y
                 camera.position.y += velocity.y * delta;
 
-                // Support au sol et plateformes
                 let groundY = 1.7;
-                const playerFootBox = new THREE.Box3(
-                    new THREE.Vector3(camera.position.x - 0.35, 0, camera.position.z - 0.35),
-                    new THREE.Vector3(camera.position.x + 0.35, camera.position.y, camera.position.z + 0.35)
-                );
-
                 for (const col of colliders) {
                     if (
                         camera.position.x >= col.min.x - 0.35 &&
@@ -635,15 +659,28 @@ export default function FirstPersonMap({ onExit }) {
                     canJump = true;
                 }
 
-                // Weapon sway / bobbing fluide
+                // --- GESTION VISÉE (ADS) ET TRANSITION FLUIDE ---
+                const targetFov = isAimingADS ? 44 : 75;
+                camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, delta * 14);
+                camera.updateProjectionMatrix();
+
+                const targetPivotPos = isAimingADS ? adsPosition : hipPosition;
+                weaponPivot.position.lerp(targetPivotPos, delta * 16);
+
+                // Weapon sway / bobbing au pas (atténué si en visée)
                 const isMoving = moveState.forward || moveState.backward || moveState.left || moveState.right;
-                if (isMoving && canJump) {
+                if (isMoving && canJump && !isAimingADS) {
                     bobTimer += delta * (moveState.sprint ? 14 : 9);
-                    weaponGroup.position.x = Math.sin(bobTimer) * 0.015;
-                    weaponGroup.position.y = Math.cos(bobTimer * 2) * 0.01;
+                    weaponMeshGroup.position.x = Math.sin(bobTimer) * 0.015;
+                    weaponMeshGroup.position.y = Math.cos(bobTimer * 2) * 0.01;
+                } else if (isAimingADS) {
+                    // Respiration subtile au viseur
+                    bobTimer += delta * 2;
+                    weaponMeshGroup.position.x = Math.sin(bobTimer) * 0.001;
+                    weaponMeshGroup.position.y = Math.cos(bobTimer * 2) * 0.001;
                 } else {
-                    weaponGroup.position.x = 0;
-                    weaponGroup.position.y = 0;
+                    weaponMeshGroup.position.x = 0;
+                    weaponMeshGroup.position.y = 0;
                 }
             }
 
@@ -667,6 +704,8 @@ export default function FirstPersonMap({ onExit }) {
             window.removeEventListener('keydown', onKeyDown);
             window.removeEventListener('keyup', onKeyUp);
             window.removeEventListener('mousedown', onMouseDown);
+            window.removeEventListener('mouseup', onMouseUp);
+            window.removeEventListener('contextmenu', onContextMenu);
             controls.removeEventListener('lock', onLock);
             controls.removeEventListener('unlock', onUnlock);
             controls.dispose();
@@ -688,20 +727,25 @@ export default function FirstPersonMap({ onExit }) {
                 }}
             />
 
-            {/* Réticule de visée tactique */}
+            {/* Réticule de visée tactique dynamique */}
             {isLocked && (
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                     <div className="relative flex items-center justify-center">
-                        <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full shadow-[0_0_8px_rgba(6,182,212,0.9)]"></div>
-                        <div className="absolute w-4 h-0.5 bg-cyan-400/70 -left-6"></div>
-                        <div className="absolute w-4 h-0.5 bg-cyan-400/70 -right-6"></div>
-                        <div className="absolute h-4 w-0.5 bg-cyan-400/70 -top-6"></div>
-                        <div className="absolute h-4 w-0.5 bg-cyan-400/70 -bottom-6"></div>
+                        {/* Point central fin */}
+                        <div className={`w-1.5 h-1.5 rounded-full transition-all duration-150 ${
+                            isAiming ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,1)] scale-75' : 'bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.9)]'
+                        }`}></div>
+
+                        {/* Barres réticule au jugé (s'estompent en mode visée ADS) */}
+                        <div className={`absolute w-4 h-0.5 bg-cyan-400/70 -left-6 transition-opacity duration-150 ${isAiming ? 'opacity-0' : 'opacity-100'}`}></div>
+                        <div className={`absolute w-4 h-0.5 bg-cyan-400/70 -right-6 transition-opacity duration-150 ${isAiming ? 'opacity-0' : 'opacity-100'}`}></div>
+                        <div className={`absolute h-4 w-0.5 bg-cyan-400/70 -top-6 transition-opacity duration-150 ${isAiming ? 'opacity-0' : 'opacity-100'}`}></div>
+                        <div className={`absolute h-4 w-0.5 bg-cyan-400/70 -bottom-6 transition-opacity duration-150 ${isAiming ? 'opacity-0' : 'opacity-100'}`}></div>
                     </div>
                 </div>
             )}
 
-            {/* HUD Supérieur : Score, Précision, Cibles */}
+            {/* HUD Supérieur : Score, Précision, Touches */}
             <div className="pointer-events-none absolute top-6 left-8 right-8 flex items-center justify-between text-white">
                 <div className="flex items-center space-x-6 bg-slate-900/80 backdrop-blur border border-slate-700/60 px-5 py-3 rounded-lg shadow-lg">
                     <div>
@@ -720,8 +764,15 @@ export default function FirstPersonMap({ onExit }) {
                     </div>
                 </div>
 
-                <div className="bg-slate-900/80 backdrop-blur border border-slate-700/60 px-4 py-2.5 rounded-lg text-xs tracking-wider text-slate-300">
-                    STAND DE TIR TACTIQUE • <span className="text-cyan-400 font-medium">GASHOOTER</span>
+                <div className="flex items-center space-x-3">
+                    {isAiming && (
+                        <div className="bg-red-500/20 border border-red-500/50 text-red-300 px-3 py-1.5 rounded text-[11px] font-bold tracking-widest uppercase animate-pulse">
+                            ADS ACTIF • ZOOM 1.8X
+                        </div>
+                    )}
+                    <div className="bg-slate-900/80 backdrop-blur border border-slate-700/60 px-4 py-2.5 rounded-lg text-xs tracking-wider text-slate-300">
+                        STAND DE TIR • <span className="text-cyan-400 font-medium">GASHOOTER</span>
+                    </div>
                 </div>
             </div>
 
@@ -729,9 +780,9 @@ export default function FirstPersonMap({ onExit }) {
             <div className="pointer-events-none absolute bottom-6 left-8 right-8 flex items-end justify-between">
                 <div className="bg-slate-900/80 backdrop-blur border border-slate-700/60 px-4 py-3 rounded-lg text-xs text-slate-300 space-y-1 shadow-lg">
                     <div className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-1">Commandes</div>
-                    <div><span className="text-cyan-400 font-semibold">[Z / Q / S / D]</span> ou Flèches : Se déplacer</div>
-                    <div><span className="text-cyan-400 font-semibold">[ESPACE]</span> : Sauter • <span className="text-cyan-400 font-semibold">[SHIFT]</span> : Courir</div>
-                    <div><span className="text-cyan-400 font-semibold">[CLIC GAUCHE]</span> : Tirer • <span className="text-cyan-400 font-semibold">[ÉCHAP]</span> : Menu</div>
+                    <div><span className="text-cyan-400 font-semibold">[Z / Q / S / D]</span> : Se déplacer • <span className="text-cyan-400 font-semibold">[ESPACE]</span> : Sauter</div>
+                    <div><span className="text-cyan-400 font-semibold">[CLIC GAUCHE]</span> : Tirer • <span className="text-cyan-400 font-semibold">[CLIC DROIT MAINTENU]</span> : 🎯 Viser (ADS Zoom)</div>
+                    <div><span className="text-cyan-400 font-semibold">[SHIFT]</span> : Courir • <span className="text-cyan-400 font-semibold">[ÉCHAP]</span> : Menu</div>
                 </div>
 
                 {/* Bouton Quitter */}
