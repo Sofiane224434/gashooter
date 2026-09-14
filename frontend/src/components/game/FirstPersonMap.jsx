@@ -18,7 +18,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
     const [isAiming, setIsAiming] = useState(false);
     const [isCrouching, setIsCrouching] = useState(false);
     const [isSliding, setIsSliding] = useState(false);
-    const [activeWeaponSlot, setActiveWeaponSlot] = useState(1); // 1 = Fusil d'Assaut, 2 = Sniper
+    const [activeWeaponSlot, setActiveWeaponSlot] = useState(1); // 1 = AR-47, 2 = AWP-50 Sniper
     const [autoSprint, setAutoSprint] = useState(() => {
         const saved = localStorage.getItem('gashooter_autosprint');
         return saved === null ? true : saved === 'true';
@@ -31,7 +31,6 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
     const [shotsFired, setShotsFired] = useState(0);
     const [shotsHit, setShotsHit] = useState(0);
 
-    // Munitions séparées par arme
     const [weaponsAmmo, setWeaponsAmmo] = useState({
         1: { mag: 30, maxMag: 30, reserve: 90, name: 'AR-47 ASSAULT', fireRate: 110, damage: 20 },
         2: { mag: 5, maxMag: 5, reserve: 25, name: 'AWP-50 SNIPER', fireRate: 1150, damage: 65 }
@@ -269,7 +268,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
         addGiantPillar(-25, 25);
         addGiantPillar(25, 25);
 
-        // --- 5. MODÈLE DE JOUEUR ADVERSE AVEC ARME DÉTAILLÉE ---
+        // --- 5. MODÈLE DE COMBATTANT DISTANT ---
         const remotePlayersMap = new Map();
 
         const createRealisticPlayerModel = (name, colorHex, spawnPos) => {
@@ -290,6 +289,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
 
             const plateCarrier = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.55, 0.36), armorMat);
             plateCarrier.position.set(0, 0.05, 0);
+            plateCarrier.castShadow = true;
             chestGroup.add(plateCarrier);
 
             for (let i = -1; i <= 1; i++) {
@@ -307,7 +307,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             chestGroup.add(shoulderR);
             fighterGroup.add(chestGroup);
 
-            // Ceinture & Holster
+            // Ceinture
             const belt = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.12, 0.34), plateMat);
             belt.position.set(0, 0.76, 0);
             fighterGroup.add(belt);
@@ -378,7 +378,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
 
             fighterGroup.add(rifleGroup);
 
-            // Tête Cible de Tir
+            // Tête Cible
             const headGroup = new THREE.Group();
             headGroup.position.set(0, 1.85, 0);
 
@@ -406,7 +406,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
 
             fighterGroup.add(headGroup);
 
-            // Barre de Vie 3D Billboard
+            // Billboard Health Bar
             const billboardGroup = new THREE.Group();
             billboardGroup.position.set(0, 2.55, 0);
 
@@ -621,36 +621,49 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             registerBox(box);
         });
 
-        // --- 8. SYSTÈME MULTI-ARMES (FUSIL D'ASSAUT & SNIPER) ---
+        // --- 8. ARME DU JOUEUR LOCAL : RESTAURATION COMPLÈTE DE L'ARME D'ORIGINE + SNIPER ---
         const weaponPivot = new THREE.Group();
-        const gunMetalMat = new THREE.MeshStandardMaterial({ color: 0x09090b, metalness: 0.9, roughness: 0.25 });
-        const gunSteelMat = new THREE.MeshStandardMaterial({ color: 0x27272a, metalness: 0.95, roughness: 0.15 });
+        const gunMetalMat = new THREE.MeshStandardMaterial({ color: 0x18181b, metalness: 0.85, roughness: 0.3 });
+        const gunSteelMat = new THREE.MeshStandardMaterial({ color: 0x3f3f46, metalness: 0.9, roughness: 0.2 });
         const sightGlowMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
-        const scopeGreenGlowMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
 
-        // Modèle 1 : Fusil d'Assaut AR-47
+        // MODÈLE 1 : FUSIL D'ASSAUT D'ORIGINE (AR-47 COMPLET)
         const arMeshGroup = new THREE.Group();
-        const arBody = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.14, 0.62), gunMetalMat);
+
+        const arBody = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.14, 0.6), gunMetalMat);
         arBody.position.set(0.24, -0.22, -0.45);
         arMeshGroup.add(arBody);
 
-        const arBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.52, 16), gunSteelMat);
+        const arBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 16), gunSteelMat);
         arBarrel.rotation.x = Math.PI / 2;
-        arBarrel.position.set(0.24, -0.18, -0.82);
+        arBarrel.position.set(0.24, -0.18, -0.8);
         arMeshGroup.add(arBarrel);
 
         const arMuzzle = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.08), gunSteelMat);
-        arMuzzle.position.set(0.24, -0.18, -1.08);
+        arMuzzle.position.set(0.24, -0.18, -1.06);
         arMeshGroup.add(arMuzzle);
 
-        const arMag = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.24, 0.12), new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.6 }));
+        const arMag = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.24, 0.12), gunSteelMat);
         arMag.position.set(0.24, -0.36, -0.42);
         arMag.rotation.x = Math.PI / 12;
         arMeshGroup.add(arMag);
 
-        const arSight = new THREE.Mesh(new THREE.RingGeometry(0.008, 0.016, 16), sightGlowMat);
-        arSight.position.set(0.24, -0.065, -0.5);
-        arMeshGroup.add(arSight);
+        const arGrip = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.22, 0.1), gunMetalMat);
+        arGrip.position.set(0.24, -0.34, -0.26);
+        arGrip.rotation.x = -Math.PI / 6;
+        arMeshGroup.add(arGrip);
+
+        const arSightBase = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.06, 0.16), gunMetalMat);
+        arSightBase.position.set(0.24, -0.11, -0.45);
+        arMeshGroup.add(arSightBase);
+
+        const arSightFrame = new THREE.Mesh(new THREE.TorusGeometry(0.038, 0.006, 8, 16), gunMetalMat);
+        arSightFrame.position.set(0.24, -0.065, -0.5);
+        arMeshGroup.add(arSightFrame);
+
+        const arSightDot = new THREE.Mesh(new THREE.RingGeometry(0.008, 0.016, 16), sightGlowMat);
+        arSightDot.position.set(0.24, -0.065, -0.5);
+        arMeshGroup.add(arSightDot);
 
         const arFlash = new THREE.PointLight(0xffedd5, 0, 8);
         arFlash.position.set(0.24, -0.18, -1.1);
@@ -658,40 +671,39 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
 
         weaponPivot.add(arMeshGroup);
 
-        // Modèle 2 : Fusil de Sniper AWP-50
+        // MODÈLE 2 : FUSIL SNIPER LOURD (AWP-50)
         const sniperMeshGroup = new THREE.Group();
         sniperMeshGroup.visible = false;
 
-        const snipBody = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.16, 0.8), gunMetalMat);
+        const snipBody = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.16, 0.75), gunMetalMat);
         snipBody.position.set(0.24, -0.22, -0.45);
         sniperMeshGroup.add(snipBody);
 
-        // Canon lourd sniper
-        const snipBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.02, 0.9, 16), gunSteelMat);
+        const snipBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.02, 0.85, 16), gunSteelMat);
         snipBarrel.rotation.x = Math.PI / 2;
-        snipBarrel.position.set(0.24, -0.16, -1.05);
+        snipBarrel.position.set(0.24, -0.16, -1.0);
         sniperMeshGroup.add(snipBarrel);
 
-        const snipBrake = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.06, 0.12), gunSteelMat);
-        snipBrake.position.set(0.24, -0.16, -1.5);
+        const snipBrake = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.06, 0.12), gunSteelMat);
+        snipBrake.position.set(0.24, -0.16, -1.45);
         sniperMeshGroup.add(snipBrake);
 
-        // Grande Lunette de Visée Téléscopique
-        const scopeTube = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.35, 16), gunMetalMat);
-        scopeTube.rotation.x = Math.PI / 2;
-        scopeTube.position.set(0.24, -0.04, -0.45);
-        sniperMeshGroup.add(scopeTube);
-
-        const scopeLens = new THREE.Mesh(new THREE.CircleGeometry(0.038, 16), scopeGreenGlowMat);
-        scopeLens.position.set(0.24, -0.04, -0.27);
-        sniperMeshGroup.add(scopeLens);
-
-        const snipMag = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.2, 0.14), gunSteelMat);
+        const snipMag = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.22, 0.14), gunSteelMat);
         snipMag.position.set(0.24, -0.36, -0.38);
         sniperMeshGroup.add(snipMag);
 
+        const snipGrip = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.22, 0.1), gunMetalMat);
+        snipGrip.position.set(0.24, -0.34, -0.26);
+        snipGrip.rotation.x = -Math.PI / 6;
+        sniperMeshGroup.add(snipGrip);
+
+        const scopeBody = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.32, 16), gunMetalMat);
+        scopeBody.rotation.x = Math.PI / 2;
+        scopeBody.position.set(0.24, -0.04, -0.45);
+        sniperMeshGroup.add(scopeBody);
+
         const snipFlash = new THREE.PointLight(0xffedd5, 0, 10);
-        snipFlash.position.set(0.24, -0.16, -1.55);
+        snipFlash.position.set(0.24, -0.16, -1.5);
         sniperMeshGroup.add(snipFlash);
 
         weaponPivot.add(sniperMeshGroup);
@@ -702,7 +714,6 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
         let currentWeaponSlot = 1;
         const hipPosition = new THREE.Vector3(0, 0, 0);
         const arAdsPos = new THREE.Vector3(-0.24, 0.065, 0.08);
-        const snipAdsPos = new THREE.Vector3(-0.24, 0.04, 0.12);
         let isAimingADS = false;
 
         const switchWeapon = (slot) => {
@@ -719,7 +730,6 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 sniperMeshGroup.visible = true;
             }
 
-            // Animation de swap
             weaponPivot.position.y = -0.25;
             setTimeout(() => {
                 weaponPivot.position.y = 0;
@@ -780,7 +790,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             });
         };
 
-        // --- 10. RECHARGEMENT POLI AVEC ANIMATION DE CULASSE MULTI-PHASE ---
+        // --- 10. RECHARGEMENT POLI ---
         let currentWeaponsAmmo = {
             1: { mag: 30, maxMag: 30, reserve: 90, name: 'AR-47 ASSAULT', fireRate: 110, damage: 20 },
             2: { mag: 5, maxMag: 5, reserve: 25, name: 'AWP-50 SNIPER', fireRate: 1150, damage: 65 }
@@ -788,7 +798,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
 
         let reloading = false;
         let reloadTimer = 0;
-        let reloadTotalDuration = 1.4;
+        let reloadTotalDuration = 1.35;
         let lastShotTime = 0;
 
         const executeReload = () => {
@@ -797,13 +807,13 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
 
             reloading = true;
             reloadTimer = 0;
-            reloadTotalDuration = currentWeaponSlot === 2 ? 1.8 : 1.35;
+            reloadTotalDuration = currentWeaponSlot === 2 ? 1.7 : 1.3;
             setIsReloading(true);
             setReloadProgress(0);
             sound.playReload();
         };
 
-        // --- 11. CONTRÔLES, AUTO-SPRINT, GLISSADE TACTIQUE ET WALL JUMP ---
+        // --- 11. CONTRÔLES, AUTO-SPRINT, GLISSADE TACTIQUE (FIX DIRECTION & COOLDOWN) ---
         const controls = new PointerLockControls(camera, canvas);
         controls.addEventListener('lock', () => setIsLocked(true));
         controls.addEventListener('unlock', () => {
@@ -817,7 +827,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
         let canJump = true;
         let sliding = false;
         let slideTimer = 0;
-        let slideDirVec = new THREE.Vector3();
+        let slideCooldown = 0;
         let wallJumpCooldown = 0;
         let normalEyeHeight = 1.7;
         let currentEyeHeight = 1.7;
@@ -853,30 +863,35 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                     const isMoving = moveState.forward || moveState.backward || moveState.left || moveState.right;
                     const shouldSprint = autoSprintRef.current || moveState.sprint;
 
-                    if (isMoving && shouldSprint && canJump && !sliding) {
-                        // GLISSADE DANS LA DIRECTION DU VECTEUR DE MOUVEMENT ACTUEL
-                        const inputVec = new THREE.Vector3();
-                        if (moveState.forward) inputVec.z += 1;
-                        if (moveState.backward) inputVec.z -= 1;
-                        if (moveState.left) inputVec.x -= 1;
-                        if (moveState.right) inputVec.x += 1;
-                        if (inputVec.lengthSq() === 0) inputVec.z = 1;
-                        inputVec.normalize();
+                    // DÉCLENCHEMENT DE LA GLISSADE : DEVANT NOUS AVEC COOLDOWN
+                    if (isMoving && shouldSprint && canJump && !sliding && slideCooldown <= 0) {
+                        const forward = new THREE.Vector3();
+                        camera.getWorldDirection(forward);
+                        forward.y = 0;
+                        forward.normalize();
 
-                        slideDirVec.set(inputVec.x, 0, -inputVec.z);
-                        slideDirVec.applyEuler(new THREE.Euler(0, camera.rotation.y, 0, 'YXZ'));
-                        slideDirVec.y = 0;
-                        slideDirVec.normalize();
+                        const right = new THREE.Vector3();
+                        right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+
+                        const slideDir = new THREE.Vector3();
+                        if (moveState.forward) slideDir.add(forward);
+                        if (moveState.backward) slideDir.sub(forward);
+                        if (moveState.right) slideDir.add(right);
+                        if (moveState.left) slideDir.sub(right);
+
+                        if (slideDir.lengthSq() < 0.01) slideDir.copy(forward);
+                        slideDir.normalize();
 
                         sliding = true;
-                        slideTimer = 0.8;
+                        slideTimer = 0.65;
+                        slideCooldown = 1.3; // Empêche le spam de glissade en boucle
                         setIsSliding(true);
                         sound.playSlide();
                         setMovementToast('⚡ GLISSADE');
-                        setTimeout(() => setMovementToast(null), 1000);
+                        setTimeout(() => setMovementToast(null), 900);
 
-                        velocity.x = slideDirVec.x * 17.5;
-                        velocity.z = slideDirVec.z * 17.5;
+                        velocity.x = slideDir.x * 18.0;
+                        velocity.z = slideDir.z * 18.0;
                     } else {
                         setIsCrouching(true);
                     }
@@ -947,17 +962,14 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
         window.addEventListener('keyup', onKeyUp);
         window.addEventListener('wheel', onWheel);
 
-        // --- TIR AVEC CADENCE RÉALISTE PAR ARME ---
+        // --- TIR AVEC CADENCE RESPECTÉE ---
         const fireWeapon = () => {
             if (!controls.isLocked || reloading || isDead) return;
 
             const now = performance.now();
             const curW = currentWeaponsAmmo[currentWeaponSlot];
 
-            // Respect de la cadence de tir (cooldown)
-            if (now - lastShotTime < curW.fireRate) {
-                return;
-            }
+            if (now - lastShotTime < curW.fireRate) return;
 
             if (curW.mag <= 0) {
                 sound.playDryFire();
@@ -976,7 +988,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 sound.playSniperShot();
                 snipFlash.intensity = 10;
                 setTimeout(() => { snipFlash.intensity = 0; }, 70);
-                setTimeout(() => sound.playBoltAction(), 300);
+                setTimeout(() => sound.playBoltAction(), 320);
             } else {
                 sound.playGunshot();
                 arFlash.intensity = 6;
@@ -985,7 +997,6 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
 
             spawnBullet(true, null, null, isSniper);
 
-            // Recul de l'arme
             const recoilAmount = isSniper ? 0.22 : (isAimingADS ? 0.05 : 0.12);
             const recoilRot = isSniper ? 0.14 : (isAimingADS ? 0.03 : 0.08);
             weaponPivot.position.z += recoilAmount;
@@ -1077,38 +1088,34 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             prevTime = time;
 
             if (wallJumpCooldown > 0) wallJumpCooldown -= delta;
+            if (slideCooldown > 0) slideCooldown -= delta;
 
-            // Tir continu en automatique pour le fusil d'assaut
+            // Tir automatique pour l'AR-47
             if (isMouseDown && currentWeaponSlot === 1 && !reloading && !isDead && controls.isLocked) {
                 if (time - lastShotTime >= currentWeaponsAmmo[1].fireRate) {
                     fireWeapon();
                 }
             }
 
-            // ANIMATION DE RECHARGEMENT HAUTE QUALITÉ
+            // ANIMATION DE RECHARGEMENT POLIE
             const activeGunGroup = currentWeaponSlot === 1 ? arMeshGroup : sniperMeshGroup;
             if (reloading) {
                 reloadTimer += delta;
                 const ratio = Math.min(1.0, reloadTimer / reloadTotalDuration);
                 setReloadProgress(Math.round(ratio * 100));
 
-                // Phase 1 : Ejection chargeur (0% - 30%)
                 if (ratio < 0.3) {
                     const p = ratio / 0.3;
                     activeGunGroup.position.y = -0.2 * p;
                     activeGunGroup.position.z = -0.05 * p;
                     activeGunGroup.rotation.x = -0.35 * p;
                     activeGunGroup.rotation.z = 0.2 * p;
-                }
-                // Phase 2 : Insertion nouveau chargeur (30% - 65%)
-                else if (ratio < 0.65) {
+                } else if (ratio < 0.65) {
                     const p = (ratio - 0.3) / 0.35;
                     activeGunGroup.position.y = -0.2 + Math.sin(p * Math.PI) * 0.05;
                     activeGunGroup.rotation.x = -0.35 + p * 0.15;
                     activeGunGroup.rotation.z = 0.2 - p * 0.1;
-                }
-                // Phase 3 : Armement culasse (65% - 100%)
-                else {
+                } else {
                     const p = (ratio - 0.65) / 0.35;
                     activeGunGroup.position.y = -0.05 * (1 - p);
                     activeGunGroup.position.z = -0.04 * (1 - p);
@@ -1235,12 +1242,12 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 }
             }
 
-            // PHYSIQUE DU JOUEUR LOCAL SANS TP DE MUR
+            // DÉPLACEMENT DU JOUEUR LOCAL
             if (controls.isLocked && !isDead) {
                 if (sliding) {
                     slideTimer -= delta;
-                    velocity.x -= velocity.x * 2.8 * delta;
-                    velocity.z -= velocity.z * 2.8 * delta;
+                    velocity.x -= velocity.x * 3.0 * delta;
+                    velocity.z -= velocity.z * 3.0 * delta;
                     if (slideTimer <= 0) {
                         sliding = false;
                         setIsSliding(false);
@@ -1300,7 +1307,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 const targetEye = sliding ? 0.85 : moveState.crouch ? 0.95 : normalEyeHeight;
                 currentEyeHeight = THREE.MathUtils.lerp(currentEyeHeight, targetEye, delta * 12);
 
-                // DÉTECTION DU SOL PRÉCISE (AUCUN TP EN HAUT DES MURS)
+                // DÉTECTION DU SOL PRÉCISE
                 camera.position.y += velocity.y * delta;
                 let groundY = currentEyeHeight;
 
@@ -1312,8 +1319,6 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                         camera.position.z <= col.max.z + 0.45
                     ) {
                         const topY = col.max.y + currentEyeHeight;
-                        // On ne grimpe sur la plateforme que si nos pieds sont déjà au niveau supérieur (marche ou chute sur plateforme)
-                        // Cela empêche totalement la téléportation quand on longe un grand mur ou pilier
                         if (camera.position.y >= topY - 0.45 && topY >= groundY) {
                             groundY = topY;
                         }
@@ -1326,13 +1331,20 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                     canJump = true;
                 }
 
-                // FOV & ADS (Zoom 4.0X pour Sniper, 1.5X pour AR)
-                const targetFov = isAimingADS ? (currentWeaponSlot === 2 ? 18 : 46) : 75;
+                // FOV & ADS
+                const targetFov = isAimingADS ? (currentWeaponSlot === 2 ? 16 : 46) : 75;
                 camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, delta * 14);
                 camera.updateProjectionMatrix();
 
-                const targetAdsPos = currentWeaponSlot === 2 ? snipAdsPos : arAdsPos;
-                const targetPivotPos = isAimingADS ? targetAdsPos : hipPosition;
+                // Position de l'arme : Si Sniper ADS -> abaisser l'arme pour dégager la vue
+                let targetPivotPos = hipPosition;
+                if (isAimingADS) {
+                    if (currentWeaponSlot === 1) {
+                        targetPivotPos = arAdsPos;
+                    } else {
+                        targetPivotPos = new THREE.Vector3(0, -1.2, 0); // Dégage la lunette plein écran
+                    }
+                }
                 weaponPivot.position.lerp(targetPivotPos, delta * 16);
 
                 const isMoving = moveState.forward || moveState.backward || moveState.left || moveState.right;
@@ -1394,15 +1406,30 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 <div className="pointer-events-none absolute inset-0 border-[6px] border-cyan-400/80 bg-cyan-500/10 z-30 animate-pulse"></div>
             )}
 
-            {/* LUNETTE DE SNIPER TACTIQUE PLEIN ÉCRAN (ADS SNIPER) */}
+            {/* LUNETTE DE SNIPER TACTIQUE PLEIN ÉCRAN ULTRA-CLAIRE (ADS SNIPER) */}
             {isLocked && isAiming && activeWeaponSlot === 2 && !isDead && (
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-30">
-                    <div className="absolute inset-0 bg-radial from-transparent via-black/70 to-black/95"></div>
-                    <div className="relative w-96 h-96 rounded-full border-2 border-emerald-400/70 shadow-[0_0_50px_rgba(16,185,129,0.3)] flex items-center justify-center">
-                        <div className="absolute w-full h-px bg-emerald-400/80"></div>
-                        <div className="absolute h-full w-px bg-emerald-400/80"></div>
-                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,1)]"></div>
-                        <div className="absolute bottom-6 text-[10px] text-emerald-400 font-mono tracking-widest uppercase">
+                <div
+                    className="pointer-events-none absolute inset-0 flex items-center justify-center z-30"
+                    style={{
+                        background: 'radial-gradient(circle 260px at center, transparent 96%, rgba(0,0,0,0.92) 98%, #000000 100%)'
+                    }}
+                >
+                    <div className="relative w-[520px] h-[520px] rounded-full border-2 border-emerald-400/80 shadow-[0_0_40px_rgba(16,185,129,0.3)] flex items-center justify-center">
+                        {/* Réticule Mil-Dot */}
+                        <div className="absolute w-full h-[1.5px] bg-emerald-400/80"></div>
+                        <div className="absolute h-full w-[1.5px] bg-emerald-400/80"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,1)]"></div>
+
+                        {/* Graduations de distance */}
+                        <div className="absolute top-1/4 w-8 h-[1px] bg-emerald-400/70"></div>
+                        <div className="absolute top-1/3 w-12 h-[1.5px] bg-emerald-400/70"></div>
+                        <div className="absolute bottom-1/3 w-12 h-[1.5px] bg-emerald-400/70"></div>
+                        <div className="absolute bottom-1/4 w-8 h-[1px] bg-emerald-400/70"></div>
+
+                        <div className="absolute left-1/4 h-8 w-[1px] bg-emerald-400/70"></div>
+                        <div className="absolute right-1/4 h-8 w-[1px] bg-emerald-400/70"></div>
+
+                        <div className="absolute bottom-8 text-[11px] text-emerald-400 font-mono tracking-widest uppercase font-bold bg-black/60 px-3 py-1 rounded-full border border-emerald-500/40">
                             AWP-50 • RANGE 4.0X • READY
                         </div>
                     </div>
@@ -1445,7 +1472,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 </div>
             )}
 
-            {/* Réticule de visée normal */}
+            {/* Réticule de visée normal (masqué lors du scope sniper) */}
             {isLocked && !isDead && !(isAiming && activeWeaponSlot === 2) && (
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                     <div className="relative flex items-center justify-center">
@@ -1517,7 +1544,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                     {/* Bouton Option Course Auto */}
                     <button
                         onClick={toggleAutoSprint}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold tracking-wider uppercase border transition-all cursor-pointer ${
+                        className={`px-3.5 py-1.5 rounded-lg text-xs font-bold tracking-wider uppercase border transition-all cursor-pointer ${
                             autoSprint
                                 ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.3)]'
                                 : 'bg-slate-800/80 border-slate-700 text-slate-400 hover:text-white'
@@ -1540,7 +1567,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 </div>
             </div>
 
-            {/* SÉLECTEUR D'ARMES RAPIDE (SLOT 1 & SLOT 2) */}
+            {/* SÉLECTEUR D'ARMES RAPIDE */}
             <div className="pointer-events-none absolute bottom-28 right-8 flex space-x-2 z-30">
                 <div className={`px-4 py-2 rounded-xl border backdrop-blur text-xs font-bold transition-all ${
                     activeWeaponSlot === 1
