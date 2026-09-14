@@ -1,13 +1,10 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { PBRTextureGenerator } from '../../services/textureGenerator.js';
-import { ModelBuilder } from '../../services/modelBuilder.js';
-import { WeaponBuilder } from '../../services/weaponBuilder.js';
 
 export default function FirstPersonMap({ onExit }) {
     const canvasRef = useRef(null);
@@ -15,35 +12,27 @@ export default function FirstPersonMap({ onExit }) {
     onExitRef.current = onExit;
 
     const [isLocked, setIsLocked] = useState(false);
-    const [targetsHit, setTargetsHit] = useState(0);
-    const [currentZoneName, setCurrentZoneName] = useState('PLAINE FORESTIÈRE');
-    const [currentWeaponIndex, setCurrentWeaponIndex] = useState(0); // 0..4
-    const totalTargets = 10;
-
-    const weaponsList = [
-        { id: 'rifle', name: "FUSIL D'ASSAUT M4 (Modèle 3D GLB)", type: 'Automatique', icon: '🔫', rpm: '650 RPM', damage: 'Moyen' },
-        { id: 'sniper', name: 'FUSIL TACTIQUE SNIPER (Modèle 3D GLB)', type: 'Précision', icon: '🎯', rpm: '60 RPM', damage: 'Ultra Élevé' },
-        { id: 'heavy_gun', name: 'CANON LOURD MULTI-TUBES (Modèle 3D GLB)', type: 'Lourd', icon: '💥', rpm: '400 RPM', damage: 'Dévastateur' },
-        { id: 'pistol', name: 'PISTOLET TACTIQUE 9MM (Modèle 3D GLB)', type: 'Semi-Auto', icon: '🗡️', rpm: '350 RPM', damage: 'Équilibré' },
-        { id: 'sword', name: 'LAME DE COMBAT TACTIQUE (Modèle 3D GLB)', type: 'Mêlée / Assaut', icon: '⚔️', rpm: 'Attaque Rapide', damage: 'Tranchant' }
-    ];
+    const [score, setScore] = useState(0);
+    const [shotsFired, setShotsFired] = useState(0);
+    const [shotsHit, setShotsHit] = useState(0);
+    const [activeMessage, setActiveMessage] = useState('Cliquez pour verrouiller la vue et viser');
 
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
 
-        // 1. Scene, Camera & Renderer
+        // --- 1. SCÈNE, CAMÉRA & RENDERER ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x38bdf8);
-        scene.fog = new THREE.FogExp2(0xbae6fd, 0.005);
+        scene.background = new THREE.Color(0x0a0e17);
+        scene.fog = new THREE.FogExp2(0x0a0e17, 0.015);
 
         const camera = new THREE.PerspectiveCamera(
             75,
             window.innerWidth / window.innerHeight,
             0.1,
-            1000
+            500
         );
-        camera.position.set(-22, 1.7, 22);
+        camera.position.set(0, 1.7, 18);
 
         const renderer = new THREE.WebGLRenderer({
             canvas: canvas,
@@ -55,287 +44,336 @@ export default function FirstPersonMap({ onExit }) {
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.35;
+        renderer.toneMappingExposure = 1.2;
         renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-        // 2. Post-Processing
+        // --- 2. POST-PROCESSING (BLOOM SUBTIL) ---
         const composer = new EffectComposer(renderer);
         const renderPass = new RenderPass(scene, camera);
         composer.addPass(renderPass);
 
         const bloomPass = new UnrealBloomPass(
             new THREE.Vector2(window.innerWidth, window.innerHeight),
-            0.4,
-            0.3,
-            0.85
+            0.35, // Force
+            0.4,  // Rayon
+            0.8   // Seuil
         );
         composer.addPass(bloomPass);
 
         const outputPass = new OutputPass();
         composer.addPass(outputPass);
 
-        // 3. Éclairage
-        const ambientLight = new THREE.AmbientLight(0xffffff, 2.5);
+        // --- 3. ÉCLAIRAGE COHÉRENT & ÉPURÉ ---
+        const ambientLight = new THREE.AmbientLight(0x1e293b, 1.8);
         scene.add(ambientLight);
 
-        const sunLight = new THREE.DirectionalLight(0xfffbeb, 3.4);
-        sunLight.position.set(45, 70, 40);
-        sunLight.castShadow = true;
-        sunLight.shadow.mapSize.width = 2048;
-        sunLight.shadow.mapSize.height = 2048;
-        sunLight.shadow.camera.near = 1;
-        sunLight.shadow.camera.far = 170;
-        sunLight.shadow.bias = -0.0003;
-        scene.add(sunLight);
+        const mainLight = new THREE.DirectionalLight(0xe2e8f0, 2.5);
+        mainLight.position.set(20, 30, 25);
+        mainLight.castShadow = true;
+        mainLight.shadow.mapSize.width = 2048;
+        mainLight.shadow.mapSize.height = 2048;
+        mainLight.shadow.camera.near = 0.5;
+        mainLight.shadow.camera.far = 100;
+        mainLight.shadow.camera.left = -35;
+        mainLight.shadow.camera.right = 35;
+        mainLight.shadow.camera.top = 35;
+        mainLight.shadow.camera.bottom = -35;
+        mainLight.shadow.bias = -0.0005;
+        scene.add(mainLight);
 
-        const skyFill = new THREE.DirectionalLight(0x7dd3fc, 1.3);
-        skyFill.position.set(-45, 35, -35);
-        scene.add(skyFill);
+        const cyanBacklight = new THREE.PointLight(0x06b6d4, 3.0, 40);
+        cyanBacklight.position.set(0, 8, -20);
+        scene.add(cyanBacklight);
 
-        // 4. Terrains
-        const grassMat = PBRTextureGenerator.createGrassTerrainMaterial(20, 20);
-        const volcanoMat = PBRTextureGenerator.createVolcanoTerrainMaterial(16, 16);
-        const asphaltMat = PBRTextureGenerator.createCityAsphaltMaterial(16, 16);
+        const amberAccent = new THREE.PointLight(0xf59e0b, 2.0, 30);
+        amberAccent.position.set(-15, 6, 0);
+        scene.add(amberAccent);
 
-        const addTerrain = (x, z, w, d, material) => {
-            const geo = new THREE.PlaneGeometry(w, d);
-            const mesh = new THREE.Mesh(geo, material);
-            mesh.position.set(x, 0, z);
-            mesh.rotation.x = -Math.PI / 2;
-            mesh.receiveShadow = true;
-            scene.add(mesh);
-            return mesh;
-        };
+        // --- 4. MATÉRIAUX DESIGN SYSTEM UNIFIÉ ---
+        const floorMat = new THREE.MeshStandardMaterial({
+            color: 0x111827,
+            roughness: 0.65,
+            metalness: 0.2
+        });
+        const gridWallMat = new THREE.MeshStandardMaterial({
+            color: 0x1e293b,
+            roughness: 0.8,
+            metalness: 0.3
+        });
+        const columnMat = new THREE.MeshStandardMaterial({
+            color: 0x0f172a,
+            roughness: 0.4,
+            metalness: 0.7
+        });
+        const accentNeonMat = new THREE.MeshBasicMaterial({
+            color: 0x38bdf8
+        });
+        const platformMat = new THREE.MeshStandardMaterial({
+            color: 0x334155,
+            roughness: 0.5,
+            metalness: 0.5
+        });
 
-        addTerrain(-25, 25, 50, 50, grassMat);
-        addTerrain(0, -25, 100, 50, volcanoMat);
-        addTerrain(25, 25, 50, 50, asphaltMat);
-
-        // 5. Collisions & Objets
+        // --- 5. GÉOMÉTRIE DE L'ARÈNE (COLLISIONS SOLIDES) ---
         const colliders = [];
-        const registerCollider = (obj) => {
-            obj.updateMatrixWorld(true);
-            const box = new THREE.Box3().setFromObject(obj);
+
+        const registerBox = (mesh) => {
+            mesh.updateMatrixWorld(true);
+            const box = new THREE.Box3().setFromObject(mesh);
             colliders.push(box);
             return box;
         };
 
-        // Limites
-        const boundaryMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 });
-        const addBoundary = (x, y, z, w, h, d) => {
+        // Sol principal
+        const floorGeo = new THREE.PlaneGeometry(60, 60);
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        // Murs d'enceinte (Arena Bounds)
+        const wallH = 10;
+        const addWall = (x, y, z, w, h, d) => {
             const geo = new THREE.BoxGeometry(w, h, d);
-            const mesh = new THREE.Mesh(geo, boundaryMat);
-            mesh.position.set(x, y, z);
-            scene.add(mesh);
-            colliders.push(new THREE.Box3().setFromObject(mesh));
+            const wall = new THREE.Mesh(geo, gridWallMat);
+            wall.position.set(x, y, z);
+            wall.receiveShadow = true;
+            wall.castShadow = true;
+            scene.add(wall);
+            registerBox(wall);
         };
-        addBoundary(0, 5, -50, 100, 10, 2);
-        addBoundary(0, 5, 50, 100, 10, 2);
-        addBoundary(-50, 5, 0, 2, 10, 100);
-        addBoundary(50, 5, 0, 2, 10, 100);
+        addWall(0, wallH / 2, -30, 60, wallH, 1.5);
+        addWall(0, wallH / 2, 30, 60, wallH, 1.5);
+        addWall(-30, wallH / 2, 0, 1.5, wallH, 60);
+        addWall(30, wallH / 2, 0, 1.5, wallH, 60);
 
-        // Zone 1 : Plaine
-        const addTree = (x, z, type = 'oak', scale = 1) => {
-            const tree = (type === 'oak') ? ModelBuilder.createOakTree(scale) : ModelBuilder.createPineTree(scale);
-            tree.position.set(x, 0, z);
-            scene.add(tree);
-            const trunkBox = new THREE.Box3(
-                new THREE.Vector3(x - 0.7 * scale, 0, z - 0.7 * scale),
-                new THREE.Vector3(x + 0.7 * scale, 3.5 * scale, z + 0.7 * scale)
-            );
-            colliders.push(trunkBox);
+        // Lignes lumineuses au sol
+        const addGroundStrip = (x, z, w, d) => {
+            const geo = new THREE.PlaneGeometry(w, d);
+            const strip = new THREE.Mesh(geo, accentNeonMat);
+            strip.position.set(x, 0.01, z);
+            strip.rotation.x = -Math.PI / 2;
+            scene.add(strip);
         };
-        addTree(-10, 15, 'oak', 1.2);
-        addTree(-28, 12, 'oak', 1.0);
-        addTree(-38, 25, 'pine', 1.3);
-        addTree(-18, 38, 'pine', 1.1);
-        addTree(-35, 42, 'oak', 1.15);
+        addGroundStrip(0, -10, 40, 0.2);
+        addGroundStrip(0, 10, 40, 0.2);
+        addGroundStrip(-15, 0, 0.2, 30);
+        addGroundStrip(15, 0, 0.2, 30);
 
-        const addNaturalRock = (x, y, z, size = 3) => {
-            const rock = ModelBuilder.createNaturalRock(size);
-            rock.position.set(x, y + size * 0.8, z);
-            scene.add(rock);
-            registerCollider(rock);
+        // Piliers / Colonnes tactiques avec bandes néon
+        const addPillar = (x, z) => {
+            const group = new THREE.Group();
+            group.position.set(x, 0, z);
+
+            const pillarGeo = new THREE.BoxGeometry(2.2, 8, 2.2);
+            const pillar = new THREE.Mesh(pillarGeo, columnMat);
+            pillar.position.y = 4;
+            pillar.castShadow = true;
+            pillar.receiveShadow = true;
+            group.add(pillar);
+
+            const ringGeo = new THREE.BoxGeometry(2.3, 0.15, 2.3);
+            const ring = new THREE.Mesh(ringGeo, accentNeonMat);
+            ring.position.y = 4;
+            group.add(ring);
+
+            scene.add(group);
+            registerBox(pillar);
         };
-        addNaturalRock(-15, 0, 25, 2.2);
-        addNaturalRock(-20, 0, 28, 3.2);
-        addNaturalRock(-26, 0, 32, 4.2);
-        addNaturalRock(-8, 0, 30, 2.0);
+        addPillar(-12, -8);
+        addPillar(12, -8);
+        addPillar(-12, 12);
+        addPillar(12, 12);
 
-        // Zone 2 : Volcan
-        const addVolcanicPlatform = (x, y, z, size = 3.5) => {
-            const rock = ModelBuilder.createVolcanicRock(size);
-            rock.position.set(x, y + size * 0.7, z);
-            scene.add(rock);
-            registerCollider(rock);
-        };
-        addVolcanicPlatform(-36, 0, -16, 2.8);
-        addVolcanicPlatform(-28, 0, -24, 3.4);
-        addVolcanicPlatform(-18, 0, -32, 4.0);
-        addVolcanicPlatform(-4, 0, -38, 4.6);
-        addVolcanicPlatform(10, 0, -38, 5.0);
-        addVolcanicPlatform(22, 0, -30, 4.2);
-        addVolcanicPlatform(34, 0, -20, 3.2);
-
-        // Zone 3 : Ville
-        const addHouse = (x, z, w, h, d, wallColor, roofColor) => {
-            const house = ModelBuilder.createHouse(w, h, d, wallColor, roofColor);
-            house.position.set(x, 0, z);
-            scene.add(house);
-            registerCollider(house);
-        };
-        addHouse(36, 36, 12, 6, 14, 0xb91c1c, 0x18181b);
-        addHouse(16, 38, 10, 5, 10, 0xd97706, 0x292524);
-
-        const addCar = (x, z, rotY = 0, color = 0x2563eb) => {
-            const car = ModelBuilder.createCar(color);
-            car.position.set(x, 0, z);
-            car.rotation.y = rotY;
-            scene.add(car);
-            registerCollider(car);
-        };
-        addCar(15, 18, Math.PI / 6, 0x2563eb);
-        addCar(28, 15, -Math.PI / 4, 0xdc2626);
-        addCar(38, 22, Math.PI / 2, 0x16a34a);
-
-        const addLamp = (x, z, rotY = 0) => {
-            const lamp = ModelBuilder.createStreetLamp();
-            lamp.position.set(x, 0, z);
-            lamp.rotation.y = rotY;
-            scene.add(lamp);
-            colliders.push(new THREE.Box3(
-                new THREE.Vector3(x - 0.3, 0, z - 0.3),
-                new THREE.Vector3(x + 0.3, 5.5, z + 0.3)
-            ));
-        };
-        addLamp(12, 10, Math.PI / 4);
-        addLamp(25, 26, -Math.PI / 3);
-        addLamp(35, 10, 0);
-
-        const addSidewalk = (x, z, w, d) => {
-            const geo = new THREE.BoxGeometry(w, 0.35, d);
-            const mat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.8 });
-            const mesh = new THREE.Mesh(geo, mat);
-            mesh.position.set(x, 0.175, z);
+        // Plateformes d'élévation surélevées
+        const addPlatform = (x, y, z, w, h, d) => {
+            const geo = new THREE.BoxGeometry(w, h, d);
+            const mesh = new THREE.Mesh(geo, platformMat);
+            mesh.position.set(x, y + h / 2, z);
             mesh.castShadow = true;
             mesh.receiveShadow = true;
             scene.add(mesh);
-            colliders.push(new THREE.Box3().setFromObject(mesh));
-        };
-        addSidewalk(25, 20, 30, 4);
-        addSidewalk(20, 30, 4, 24);
+            registerBox(mesh);
 
-        // 6. Cibles Drones
-        const targetDrones = [];
-        const droneLocations = [
-            { pos: [-15, 4.5, 25], zone: 'Plaine' },
-            { pos: [-38, 5.0, 25], zone: 'Plaine' },
-            { pos: [-28, 5.5, 12], zone: 'Plaine' },
-            { pos: [-28, 5.0, -24], zone: 'Volcan' },
-            { pos: [10, 8.5, -38], zone: 'Volcan' },
-            { pos: [34, 5.5, -20], zone: 'Volcan' },
-            { pos: [15, 3.5, 18], zone: 'Ville' },
-            { pos: [28, 3.5, 15], zone: 'Ville' },
-            { pos: [36, 8.5, 36], zone: 'Ville' },
-            { pos: [16, 7.5, 38], zone: 'Ville' }
+            // Rampe d'accès
+            const rampGeo = new THREE.BoxGeometry(w, 0.4, 4);
+            const ramp = new THREE.Mesh(rampGeo, platformMat);
+            ramp.position.set(x, (y + h) / 2, z + d / 2 + 1.8);
+            ramp.rotation.x = -Math.atan2(y + h, 4);
+            ramp.castShadow = true;
+            ramp.receiveShadow = true;
+            scene.add(ramp);
+            registerBox(ramp);
+        };
+        addPlatform(-18, 0, -18, 8, 2.0, 8);
+        addPlatform(18, 0, -18, 8, 2.5, 8);
+        addPlatform(0, 0, -22, 10, 3.0, 6);
+
+        // --- 6. CIBLES D'ENTRAÎNEMENT RÉACTIVES ---
+        const targetObjects = [];
+        const targetPositions = [
+            [-8, 2.8, -12],
+            [8, 2.8, -12],
+            [-18, 4.5, -18],
+            [18, 5.0, -18],
+            [0, 5.5, -22],
+            [-22, 3.0, 0],
+            [22, 3.0, 0],
+            [-14, 2.5, 8],
+            [14, 2.5, 8],
+            [0, 3.2, -6]
         ];
 
-        droneLocations.forEach(({ pos }) => {
-            const droneGroup = new THREE.Group();
-            droneGroup.position.set(pos[0], pos[1], pos[2]);
+        targetPositions.forEach((pos, idx) => {
+            const group = new THREE.Group();
+            group.position.set(pos[0], pos[1], pos[2]);
 
-            const coreGeo = new THREE.SphereGeometry(0.55, 24, 24);
-            const coreMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
-            const core = new THREE.Mesh(coreGeo, coreMat);
-            droneGroup.add(core);
-
-            const ringGeo = new THREE.TorusGeometry(0.9, 0.06, 16, 32);
-            const ringMat = new THREE.MeshStandardMaterial({
-                color: 0x38bdf8,
-                emissive: 0x0284c7,
-                emissiveIntensity: 0.8,
-                metalness: 0.9,
+            // Cœur de cible lumineux
+            const coreGeo = new THREE.SphereGeometry(0.5, 24, 24);
+            const coreMat = new THREE.MeshStandardMaterial({
+                color: 0xef4444,
+                emissive: 0xdc2626,
+                emissiveIntensity: 0.6,
+                metalness: 0.3,
                 roughness: 0.2
             });
-            const ring = new THREE.Mesh(ringGeo, ringMat);
-            droneGroup.add(ring);
+            const core = new THREE.Mesh(coreGeo, coreMat);
+            core.castShadow = true;
+            group.add(core);
 
-            droneGroup.userData = {
+            // Anneau orbital
+            const ringGeo = new THREE.TorusGeometry(0.85, 0.05, 16, 32);
+            const ringMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            group.add(ring);
+
+            group.userData = {
                 isTarget: true,
+                index: idx,
                 core,
                 ring,
                 initialY: pos[1],
-                offset: Math.random() * Math.PI * 2
+                timeOffset: idx * 0.8
             };
 
-            scene.add(droneGroup);
-            targetDrones.push(droneGroup);
+            scene.add(group);
+            targetObjects.push(group);
         });
 
-        // Tourelles 3D défensives interactives sur la carte
-        WeaponBuilder.loadTurret((turret1) => {
-            turret1.position.set(5, 0, 8);
-            scene.add(turret1);
-            registerCollider(turret1);
-        });
-        WeaponBuilder.loadTurret((turret2) => {
-            turret2.position.set(-10, 0, -14);
-            turret2.rotation.y = Math.PI / 4;
-            scene.add(turret2);
-            registerCollider(turret2);
-        });
+        // --- 7. ARME TACTIQUE PREMIÈRE PERSONNE ---
+        const weaponGroup = new THREE.Group();
 
-        // 7. ARSENAL DE 5 ARMES 3D RÉELLES (.GLB)
-        const weaponModels = [
-            WeaponBuilder.createAssaultRifle(), // 0: M4 Assault Rifle GLB
-            WeaponBuilder.createSniperRifle(),  // 1: Aim Rifle Sniper GLB
-            WeaponBuilder.createHeavyGun(),     // 2: Heavy Machine Gun GLB
-            WeaponBuilder.createPistol(),       // 3: Tactical Pistol GLB
-            WeaponBuilder.createSword()         // 4: Combat Sword Blade GLB
-        ];
+        const gunMetalMat = new THREE.MeshStandardMaterial({ color: 0x18181b, metalness: 0.85, roughness: 0.3 });
+        const gunSteelMat = new THREE.MeshStandardMaterial({ color: 0x3f3f46, metalness: 0.9, roughness: 0.2 });
+        const gunSightMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
 
-        const weaponHolder = new THREE.Group();
-        weaponModels.forEach((wModel, idx) => {
-            wModel.visible = (idx === 0);
-            weaponHolder.add(wModel);
-        });
+        // Corps de l'arme
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.14, 0.6), gunMetalMat);
+        body.position.set(0.24, -0.22, -0.45);
+        body.castShadow = true;
+        weaponGroup.add(body);
 
-        camera.add(weaponHolder);
+        // Canon
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 16), gunSteelMat);
+        barrel.rotation.x = Math.PI / 2;
+        barrel.position.set(0.24, -0.18, -0.8);
+        weaponGroup.add(barrel);
+
+        // Frein de bouche
+        const muzzle = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.08), gunSteelMat);
+        muzzle.position.set(0.24, -0.18, -1.06);
+        weaponGroup.add(muzzle);
+
+        // Chargeur
+        const mag = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.24, 0.12), gunSteelMat);
+        mag.position.set(0.24, -0.36, -0.42);
+        mag.rotation.x = Math.PI / 12;
+        weaponGroup.add(mag);
+
+        // Poignée
+        const grip = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.22, 0.1), gunMetalMat);
+        grip.position.set(0.24, -0.34, -0.26);
+        grip.rotation.x = -Math.PI / 6;
+        weaponGroup.add(grip);
+
+        // Viseur Point Rouge
+        const sightBase = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.05, 0.14), gunMetalMat);
+        sightBase.position.set(0.24, -0.12, -0.45);
+        weaponGroup.add(sightBase);
+
+        const sightDot = new THREE.Mesh(new THREE.RingGeometry(0.012, 0.024, 16), gunSightMat);
+        sightDot.position.set(0.24, -0.095, -0.5);
+        weaponGroup.add(sightDot);
+
+        camera.add(weaponGroup);
         scene.add(camera);
 
-        let activeWeaponIdx = 0;
-        const setWeapon = (idx) => {
-            if (idx < 0 || idx >= weaponModels.length) return;
-            activeWeaponIdx = idx;
-            setCurrentWeaponIndex(idx);
-            weaponModels.forEach((m, i) => {
-                m.visible = (i === idx);
-            });
+        // Muzzle flash lumineux
+        const flashLight = new THREE.PointLight(0xffedd5, 0, 6);
+        flashLight.position.set(0.24, -0.18, -1.1);
+        weaponGroup.add(flashLight);
+
+        // --- 8. AUDIO SYNTHÉTISÉ PROPRE ---
+        let audioCtx = null;
+        const playShotSound = () => {
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(320, now);
+                osc.frequency.exponentialRampToValueAtTime(40, now + 0.08);
+
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.08);
+            } catch (e) {}
         };
 
-        // 8. Particules
-        const sparks = [];
-        const sparkGeo = new THREE.SphereGeometry(0.04, 8, 8);
-        const sparkMat = new THREE.MeshBasicMaterial({ color: 0x34d399 });
+        const playHitSound = () => {
+            try {
+                if (!audioCtx) return;
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
 
-        const createSparks = (pos, count = 14) => {
-            for (let i = 0; i < count; i++) {
-                const spark = new THREE.Mesh(sparkGeo, sparkMat);
-                spark.position.copy(pos);
-                const vel = new THREE.Vector3(
-                    (Math.random() - 0.5) * 9,
-                    Math.random() * 7 + 2,
-                    (Math.random() - 0.5) * 9
-                );
-                scene.add(spark);
-                sparks.push({ mesh: spark, vel, life: 1.0 });
-            }
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, now);
+                osc.frequency.exponentialRampToValueAtTime(1320, now + 0.06);
+
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.06);
+            } catch (e) {}
         };
 
-        // 9. PointerLock & Clavier
+        // --- 9. CONTRÔLES & MOUVEMENT DU JOUEUR ---
         const controls = new PointerLockControls(camera, canvas);
-        const onLock = () => setIsLocked(true);
-        const onUnlock = () => setIsLocked(false);
+
+        const onLock = () => {
+            setIsLocked(true);
+            setActiveMessage('Entraînement en cours - Visez les cibles holographiques');
+        };
+        const onUnlock = () => {
+            setIsLocked(false);
+            setActiveMessage('Pause - Cliquez pour reprendre le contrôle');
+        };
         controls.addEventListener('lock', onLock);
         controls.addEventListener('unlock', onUnlock);
 
@@ -344,12 +382,6 @@ export default function FirstPersonMap({ onExit }) {
         let canJump = true;
 
         const onKeyDown = (e) => {
-            // Touches armes [1..5]
-            if (e.key >= '1' && e.key <= '5') {
-                setWeapon(Number(e.key) - 1);
-                return;
-            }
-
             switch (e.code) {
                 case 'KeyW':
                 case 'KeyZ':
@@ -375,7 +407,7 @@ export default function FirstPersonMap({ onExit }) {
                     break;
                 case 'Space':
                     if (canJump) {
-                        velocity.y = 9.0;
+                        velocity.y = 8.5;
                         canJump = false;
                     }
                     break;
@@ -416,265 +448,225 @@ export default function FirstPersonMap({ onExit }) {
             }
         };
 
-        const onWheel = (e) => {
-            if (e.deltaY > 0) {
-                setWeapon((activeWeaponIdx + 1) % weaponModels.length);
-            } else {
-                setWeapon((activeWeaponIdx - 1 + weaponModels.length) % weaponModels.length);
-            }
-        };
-
         window.addEventListener('keydown', onKeyDown);
         window.addEventListener('keyup', onKeyUp);
-        window.addEventListener('wheel', onWheel);
 
-        // 10. Système de Tir Balistique selon l'arme
+        // --- 10. SYSTÈME DE TIR & IMPACTS ---
         const raycaster = new THREE.Raycaster();
-        const lasers = [];
+        const sparks = [];
+        const sparkGeo = new THREE.SphereGeometry(0.04, 6, 6);
+        const sparkMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+
+        const createSparks = (pos) => {
+            for (let i = 0; i < 10; i++) {
+                const spark = new THREE.Mesh(sparkGeo, sparkMat);
+                spark.position.copy(pos);
+                const vel = new THREE.Vector3(
+                    (Math.random() - 0.5) * 6,
+                    Math.random() * 5 + 1,
+                    (Math.random() - 0.5) * 6
+                );
+                scene.add(spark);
+                sparks.push({ mesh: spark, vel, life: 0.8 });
+            }
+        };
 
         const fireWeapon = () => {
             if (!controls.isLocked) return;
 
+            setShotsFired((prev) => prev + 1);
+            playShotSound();
+
             // Recul de l'arme
-            const currentWeapon = weaponModels[activeWeaponIdx];
-            const recoilZ = (activeWeaponIdx === 1 || activeWeaponIdx === 2) ? 0.22 : 0.12;
-            const recoilRot = (activeWeaponIdx === 1 || activeWeaponIdx === 2) ? 0.16 : 0.08;
+            weaponGroup.position.z += 0.12;
+            weaponGroup.rotation.x += 0.08;
+            flashLight.intensity = 5;
 
-            currentWeapon.position.z += recoilZ;
-            currentWeapon.rotation.x += recoilRot;
             setTimeout(() => {
-                currentWeapon.position.z = 0;
-                currentWeapon.rotation.x = 0;
-            }, 80);
+                weaponGroup.position.z = 0;
+                weaponGroup.rotation.x = 0;
+                flashLight.intensity = 0;
+            }, 60);
 
-            // Tir en gerbe (Shotgun = 7 plombs) ou Tir unique
-            const pellets = (activeWeaponIdx === 2) ? 7 : 1;
+            // Raycast central
+            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+            const intersects = raycaster.intersectObjects(scene.children, true);
 
-            for (let p = 0; p < pellets; p++) {
-                const spreadX = (activeWeaponIdx === 2) ? (Math.random() - 0.5) * 0.08 : 0;
-                const spreadY = (activeWeaponIdx === 2) ? (Math.random() - 0.5) * 0.08 : 0;
+            if (intersects.length > 0) {
+                const hit = intersects[0];
+                createSparks(hit.point);
 
-                raycaster.setFromCamera(new THREE.Vector2(spreadX, spreadY), camera);
-                const intersects = raycaster.intersectObjects(scene.children, true);
-
-                if (intersects.length > 0) {
-                    const hit = intersects[0];
-                    createSparks(hit.point, (activeWeaponIdx === 2) ? 6 : 14);
-
-                    let obj = hit.object;
-                    while (obj.parent && !obj.userData?.isTarget && obj.parent !== scene) {
-                        obj = obj.parent;
-                    }
-
-                    if (obj && obj.userData && obj.userData.isTarget) {
-                        obj.userData.core.material.color.setHex(0xffffff);
-                        setTargetsHit((prev) => prev + 1);
-
-                        setTimeout(() => {
-                            obj.position.x = (Math.random() - 0.5) * 75;
-                            obj.position.z = (Math.random() - 0.5) * 75;
-                            obj.userData.core.material.color.setHex(0xef4444);
-                        }, 300);
-                    }
+                // Vérifier si une cible est touchée
+                let obj = hit.object;
+                while (obj.parent && !obj.userData?.isTarget && obj.parent !== scene) {
+                    obj = obj.parent;
                 }
 
-                // Laser / Projectile visuel
-                const laserColor = (activeWeaponIdx === 1) ? 0xfacc15 : (activeWeaponIdx === 4 ? 0x06b6d4 : 0x34d399);
-                const laserGeo = new THREE.CylinderGeometry(0.025, 0.025, (activeWeaponIdx === 1 ? 2.5 : 1.6), 8);
-                laserGeo.rotateX(Math.PI / 2);
-                const laserMat = new THREE.MeshBasicMaterial({ color: laserColor });
-                const laserMesh = new THREE.Mesh(laserGeo, laserMat);
+                if (obj && obj.userData && obj.userData.isTarget) {
+                    playHitSound();
+                    setShotsHit((prev) => prev + 1);
+                    setScore((prev) => prev + 100);
 
-                const startPos = new THREE.Vector3(0.24, -0.19, -0.72);
-                startPos.applyMatrix4(camera.matrixWorld);
-                laserMesh.position.copy(startPos);
+                    obj.userData.core.material.emissive.setHex(0xffffff);
+                    obj.userData.core.material.color.setHex(0xffffff);
 
-                const shootDir = new THREE.Vector3();
-                camera.getWorldDirection(shootDir);
-                shootDir.x += spreadX;
-                shootDir.y += spreadY;
-                shootDir.normalize();
-
-                laserMesh.quaternion.copy(camera.quaternion);
-                scene.add(laserMesh);
-                lasers.push({ mesh: laserMesh, dir: shootDir, distance: 0 });
-            }
-        };
-
-        window.addEventListener('mousedown', fireWeapon);
-
-        // 11. Resize
-        const handleResize = () => {
-            const w = window.innerWidth;
-            const h = window.innerHeight;
-            camera.aspect = w / h;
-            camera.updateProjectionMatrix();
-            renderer.setSize(w, h);
-            composer.setSize(w, h);
-        };
-        window.addEventListener('resize', handleResize);
-
-        // 12. Collisions Stricte
-        const playerRadius = 0.65;
-
-        const checkCollisionAt = (posX, posZ, currentY) => {
-            const playerFeetY = currentY - 1.68;
-            const playerHeadY = currentY + 0.15;
-
-            const playerBox = new THREE.Box3(
-                new THREE.Vector3(posX - playerRadius, playerFeetY, posZ - playerRadius),
-                new THREE.Vector3(posX + playerRadius, playerHeadY, posZ + playerRadius)
-            );
-
-            for (let i = 0; i < colliders.length; i++) {
-                const box = colliders[i];
-                if (playerFeetY < box.max.y - 0.05 && playerHeadY > box.min.y) {
-                    if (playerBox.intersectsBox(box)) return true;
+                    // Repositionnement dynamique de la cible
+                    setTimeout(() => {
+                        obj.position.x = (Math.random() - 0.5) * 44;
+                        obj.position.z = -10 - Math.random() * 16;
+                        obj.userData.core.material.emissive.setHex(0xdc2626);
+                        obj.userData.core.material.color.setHex(0xef4444);
+                    }, 250);
                 }
             }
-            return false;
         };
 
-        const getGroundHeightAt = (posX, posZ, currentY) => {
-            let highestGround = 1.7;
-
-            for (let i = 0; i < colliders.length; i++) {
-                const box = colliders[i];
-                if (
-                    posX >= box.min.x - playerRadius * 0.85 &&
-                    posX <= box.max.x + playerRadius * 0.85 &&
-                    posZ >= box.min.z - playerRadius * 0.85 &&
-                    posZ <= box.max.z + playerRadius * 0.85
-                ) {
-                    const standableY = box.max.y + 1.7;
-                    if (currentY >= standableY - 0.8) {
-                        if (standableY > highestGround) {
-                            highestGround = standableY;
-                        }
-                    }
-                }
-            }
-            return highestGround;
+        const onMouseDown = (e) => {
+            if (e.button === 0) fireWeapon();
         };
+        window.addEventListener('mousedown', onMouseDown);
 
-        // 13. Boucle de Rendu
+        // --- 11. BOUCLE PRINCIPALE & PHYSIQUE FLUIDE ---
         let prevTime = performance.now();
-        let animId;
-        let walkCycle = 0;
+        let bobTimer = 0;
+        let animationFrameId;
 
         const animate = () => {
-            animId = requestAnimationFrame(animate);
+            animationFrameId = requestAnimationFrame(animate);
 
             const time = performance.now();
             const delta = Math.min((time - prevTime) / 1000, 0.1);
+            prevTime = time;
 
-            targetDrones.forEach((drone) => {
-                drone.position.y = drone.userData.initialY + Math.sin(time * 0.003 + drone.userData.offset) * 0.4;
-                drone.userData.ring.rotation.x += 0.03;
-                drone.userData.ring.rotation.y += 0.04;
+            // Rotation douce et lévitation des cibles
+            targetObjects.forEach((t) => {
+                t.userData.ring.rotation.z += delta * 1.5;
+                t.userData.ring.rotation.x += delta * 0.8;
+                t.position.y = t.userData.initialY + Math.sin(time * 0.003 + t.userData.timeOffset) * 0.25;
             });
 
-            for (let i = lasers.length - 1; i >= 0; i--) {
-                const laser = lasers[i];
-                laser.mesh.position.addScaledVector(laser.dir, 100 * delta);
-                laser.distance += 100 * delta;
-                if (laser.distance > 140) {
-                    scene.remove(laser.mesh);
-                    lasers.splice(i, 1);
-                }
-            }
-
+            // Particules d'étincelles
             for (let i = sparks.length - 1; i >= 0; i--) {
-                const sp = sparks[i];
-                sp.life -= delta * 2.5;
-                sp.vel.y -= 15 * delta;
-                sp.mesh.position.addScaledVector(sp.vel, delta);
-                sp.mesh.scale.setScalar(Math.max(0.01, sp.life));
-                if (sp.life <= 0) {
-                    scene.remove(sp.mesh);
+                const s = sparks[i];
+                s.life -= delta * 2;
+                s.mesh.position.addScaledVector(s.vel, delta);
+                s.vel.y -= 9.8 * delta;
+                if (s.life <= 0) {
+                    scene.remove(s.mesh);
                     sparks.splice(i, 1);
                 }
             }
 
             if (controls.isLocked) {
-                const px = camera.position.x;
-                const pz = camera.position.z;
-                if (pz <= 0) setCurrentZoneName('CRATÈRE VOLCANIQUE & LAVE');
-                else if (px <= 0) setCurrentZoneName('PLAINE NATURELLE & FORÊT');
-                else setCurrentZoneName('RUE URBAINE & VILLE');
-
-                const speed = moveState.sprint ? 72.0 : 42.0;
+                // Frottement & Amortissement
                 velocity.x -= velocity.x * 10.0 * delta;
                 velocity.z -= velocity.z * 10.0 * delta;
-                velocity.y -= 22.0 * delta;
+                velocity.y -= 22.0 * delta; // Gravité constante
 
-                const moveZ = Number(moveState.forward) - Number(moveState.backward);
-                const moveX = Number(moveState.right) - Number(moveState.left);
+                const speed = moveState.sprint ? 14.0 : 8.5;
+                const dir = new THREE.Vector3();
 
-                if (moveZ !== 0) velocity.z -= moveZ * speed * delta;
-                if (moveX !== 0) velocity.x -= moveX * speed * delta;
+                if (moveState.forward) dir.z += 1;
+                if (moveState.backward) dir.z -= 1;
+                if (moveState.left) dir.x -= 1;
+                if (moveState.right) dir.x += 1;
+                dir.normalize();
 
-                const forward = new THREE.Vector3();
-                camera.getWorldDirection(forward);
-                forward.y = 0;
-                forward.normalize();
+                if (moveState.forward || moveState.backward) velocity.z += dir.z * speed * 10.0 * delta;
+                if (moveState.left || moveState.right) velocity.x += dir.x * speed * 10.0 * delta;
 
-                const right = new THREE.Vector3();
-                right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
-
-                const moveDeltaX = (right.x * velocity.x + forward.x * -velocity.z) * delta;
-                const moveDeltaZ = (right.z * velocity.x + forward.z * -velocity.z) * delta;
-
-                const targetX = camera.position.x + moveDeltaX;
-                if (!checkCollisionAt(targetX, camera.position.z, camera.position.y)) {
-                    camera.position.x = targetX;
-                } else {
-                    velocity.x = 0;
+                // Test de déplacement en X avec collision
+                const oldX = camera.position.x;
+                controls.moveRight(velocity.x * delta);
+                const playerBoxX = new THREE.Box3(
+                    new THREE.Vector3(camera.position.x - 0.4, camera.position.y - 1.5, camera.position.z - 0.4),
+                    new THREE.Vector3(camera.position.x + 0.4, camera.position.y + 0.3, camera.position.z + 0.4)
+                );
+                for (const col of colliders) {
+                    if (playerBoxX.intersectsBox(col)) {
+                        camera.position.x = oldX;
+                        velocity.x = 0;
+                        break;
+                    }
                 }
 
-                const targetZ = camera.position.z + moveDeltaZ;
-                if (!checkCollisionAt(camera.position.x, targetZ, camera.position.y)) {
-                    camera.position.z = targetZ;
-                } else {
-                    velocity.z = 0;
+                // Test de déplacement en Z avec collision
+                const oldZ = camera.position.z;
+                controls.moveForward(velocity.z * delta);
+                const playerBoxZ = new THREE.Box3(
+                    new THREE.Vector3(camera.position.x - 0.4, camera.position.y - 1.5, camera.position.z - 0.4),
+                    new THREE.Vector3(camera.position.x + 0.4, camera.position.y + 0.3, camera.position.z + 0.4)
+                );
+                for (const col of colliders) {
+                    if (playerBoxZ.intersectsBox(col)) {
+                        camera.position.z = oldZ;
+                        velocity.z = 0;
+                        break;
+                    }
                 }
 
+                // Test de gravité en Y
                 camera.position.y += velocity.y * delta;
-                const currentGround = getGroundHeightAt(camera.position.x, camera.position.z, camera.position.y);
 
-                if (camera.position.y <= currentGround) {
-                    camera.position.y = currentGround;
+                // Support au sol et plateformes
+                let groundY = 1.7;
+                const playerFootBox = new THREE.Box3(
+                    new THREE.Vector3(camera.position.x - 0.35, 0, camera.position.z - 0.35),
+                    new THREE.Vector3(camera.position.x + 0.35, camera.position.y, camera.position.z + 0.35)
+                );
+
+                for (const col of colliders) {
+                    if (
+                        camera.position.x >= col.min.x - 0.35 &&
+                        camera.position.x <= col.max.x + 0.35 &&
+                        camera.position.z >= col.min.z - 0.35 &&
+                        camera.position.z <= col.max.z + 0.35
+                    ) {
+                        const topY = col.max.y + 1.7;
+                        if (camera.position.y <= topY + 0.4 && topY >= groundY) {
+                            groundY = topY;
+                        }
+                    }
+                }
+
+                if (camera.position.y <= groundY) {
+                    camera.position.y = groundY;
                     velocity.y = 0;
                     canJump = true;
                 }
 
-                const isMoving = (moveX !== 0 || moveZ !== 0);
-                if (isMoving && Math.abs(camera.position.y - currentGround) < 0.05) {
-                    walkCycle += delta * (moveState.sprint ? 14 : 9);
-                    weaponHolder.position.x = Math.sin(walkCycle) * 0.015;
-                    weaponHolder.position.y = Math.cos(walkCycle * 2) * 0.012;
+                // Weapon sway / bobbing fluide
+                const isMoving = moveState.forward || moveState.backward || moveState.left || moveState.right;
+                if (isMoving && canJump) {
+                    bobTimer += delta * (moveState.sprint ? 14 : 9);
+                    weaponGroup.position.x = Math.sin(bobTimer) * 0.015;
+                    weaponGroup.position.y = Math.cos(bobTimer * 2) * 0.01;
                 } else {
-                    weaponHolder.position.x = THREE.MathUtils.lerp(weaponHolder.position.x, 0, 0.1);
-                    weaponHolder.position.y = THREE.MathUtils.lerp(weaponHolder.position.y, 0, 0.1);
+                    weaponGroup.position.x = 0;
+                    weaponGroup.position.y = 0;
                 }
-
-                camera.position.x = Math.max(-47, Math.min(47, camera.position.x));
-                camera.position.z = Math.max(-47, Math.min(47, camera.position.z));
             }
 
             composer.render();
-            prevTime = time;
         };
 
         animate();
 
+        // --- 12. REDIMENSIONNEMENT ---
+        const handleResize = () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        };
+        window.addEventListener('resize', handleResize);
+
         return () => {
+            cancelAnimationFrame(animationFrameId);
             window.removeEventListener('resize', handleResize);
             window.removeEventListener('keydown', onKeyDown);
             window.removeEventListener('keyup', onKeyUp);
-            window.removeEventListener('wheel', onWheel);
-            window.removeEventListener('mousedown', fireWeapon);
-            cancelAnimationFrame(animId);
+            window.removeEventListener('mousedown', onMouseDown);
             controls.removeEventListener('lock', onLock);
             controls.removeEventListener('unlock', onUnlock);
             controls.dispose();
@@ -682,121 +674,108 @@ export default function FirstPersonMap({ onExit }) {
         };
     }, []);
 
-    const requestLock = useCallback(() => {
-        if (canvasRef.current) {
-            canvasRef.current.requestPointerLock();
-        }
-    }, []);
+    const accuracy = shotsFired > 0 ? Math.round((shotsHit / shotsFired) * 100) : 100;
 
     return (
-        <div className="relative w-full h-screen overflow-hidden bg-black select-none font-sans">
+        <div className="relative w-screen h-screen overflow-hidden bg-black select-none font-sans">
+            {/* Canvas 3D */}
             <canvas
                 ref={canvasRef}
-                onClick={requestLock}
                 className="w-full h-full block cursor-crosshair"
+                onClick={() => {
+                    const canvas = canvasRef.current;
+                    if (canvas && !isLocked) canvas.requestPointerLock();
+                }}
             />
 
-            {/* Réticule de visée */}
+            {/* Réticule de visée tactique */}
             {isLocked && (
-                <div className="pointer-events-none fixed inset-0 flex items-center justify-center z-20">
-                    <div className="relative w-7 h-7">
-                        <div className="absolute top-1/2 left-0 w-2.5 h-0.5 bg-emerald-400 -translate-y-1/2 shadow-[0_0_8px_#10b981]"></div>
-                        <div className="absolute top-1/2 right-0 w-2.5 h-0.5 bg-emerald-400 -translate-y-1/2 shadow-[0_0_8px_#10b981]"></div>
-                        <div className="absolute top-0 left-1/2 w-0.5 h-2.5 bg-emerald-400 -translate-x-1/2 shadow-[0_0_8px_#10b981]"></div>
-                        <div className="absolute bottom-0 left-1/2 w-0.5 h-2.5 bg-emerald-400 -translate-x-1/2 shadow-[0_0_8px_#10b981]"></div>
-                        <div className="absolute top-1/2 left-1/2 w-1.5 h-1.5 bg-emerald-200 rounded-full -translate-x-1/2 -translate-y-1/2 shadow-[0_0_10px_#10b981]"></div>
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <div className="relative flex items-center justify-center">
+                        <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full shadow-[0_0_8px_rgba(6,182,212,0.9)]"></div>
+                        <div className="absolute w-4 h-0.5 bg-cyan-400/70 -left-6"></div>
+                        <div className="absolute w-4 h-0.5 bg-cyan-400/70 -right-6"></div>
+                        <div className="absolute h-4 w-0.5 bg-cyan-400/70 -top-6"></div>
+                        <div className="absolute h-4 w-0.5 bg-cyan-400/70 -bottom-6"></div>
                     </div>
                 </div>
             )}
 
-            {/* HUD Supérieur Réaliste */}
-            <div className="pointer-events-none absolute top-4 left-6 z-20 flex flex-wrap items-center gap-3 font-mono text-xs sm:text-sm text-zinc-100">
-                <div className="px-4 py-2 bg-slate-900/90 border border-emerald-500/50 rounded-xl backdrop-blur-md shadow-lg flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span>BIOME : <strong className="text-emerald-400 font-bold">{currentZoneName}</strong></span>
+            {/* HUD Supérieur : Score, Précision, Cibles */}
+            <div className="pointer-events-none absolute top-6 left-8 right-8 flex items-center justify-between text-white">
+                <div className="flex items-center space-x-6 bg-slate-900/80 backdrop-blur border border-slate-700/60 px-5 py-3 rounded-lg shadow-lg">
+                    <div>
+                        <div className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">Score</div>
+                        <div className="text-2xl font-black text-cyan-400 tracking-tight">{score}</div>
+                    </div>
+                    <div className="w-px h-8 bg-slate-700"></div>
+                    <div>
+                        <div className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">Précision</div>
+                        <div className="text-xl font-bold text-slate-200">{accuracy}%</div>
+                    </div>
+                    <div className="w-px h-8 bg-slate-700"></div>
+                    <div>
+                        <div className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">Touches</div>
+                        <div className="text-xl font-bold text-emerald-400">{shotsHit} / {shotsFired}</div>
+                    </div>
                 </div>
-                <div className="px-4 py-2 bg-slate-900/90 border border-zinc-700 rounded-xl backdrop-blur-md">
-                    CIBLES : <strong className="text-emerald-400 font-bold">{targetsHit}</strong> / {totalTargets}
+
+                <div className="bg-slate-900/80 backdrop-blur border border-slate-700/60 px-4 py-2.5 rounded-lg text-xs tracking-wider text-slate-300">
+                    STAND DE TIR TACTIQUE • <span className="text-cyan-400 font-medium">GASHOOTER</span>
                 </div>
             </div>
 
-            {/* SÉLECTEUR D'ARMES DYNAMIQUE (Bas de l'écran) */}
-            <div className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 font-mono">
-                {weaponsList.map((w, idx) => {
-                    const isSelected = currentWeaponIndex === idx;
-                    return (
-                        <div
-                            key={w.id}
-                            className={`px-3 py-1.5 rounded-xl backdrop-blur-md transition-all border flex items-center gap-2 ${
-                                isSelected
-                                    ? 'bg-emerald-500/25 border-emerald-400 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-105'
-                                    : 'bg-slate-950/80 border-white/10 text-zinc-400 opacity-70'
-                            }`}
-                        >
-                            <span className="text-xs font-black text-emerald-400">[{idx + 1}]</span>
-                            <span className="text-sm">{w.icon}</span>
-                            <div className="text-left hidden sm:block">
-                                <div className="text-xs font-bold leading-tight">{w.name}</div>
-                                <div className="text-[10px] text-zinc-400">{w.type} • {w.rpm}</div>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
+            {/* HUD Inférieur : Commandes & Aide */}
+            <div className="pointer-events-none absolute bottom-6 left-8 right-8 flex items-end justify-between">
+                <div className="bg-slate-900/80 backdrop-blur border border-slate-700/60 px-4 py-3 rounded-lg text-xs text-slate-300 space-y-1 shadow-lg">
+                    <div className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-1">Commandes</div>
+                    <div><span className="text-cyan-400 font-semibold">[Z / Q / S / D]</span> ou Flèches : Se déplacer</div>
+                    <div><span className="text-cyan-400 font-semibold">[ESPACE]</span> : Sauter • <span className="text-cyan-400 font-semibold">[SHIFT]</span> : Courir</div>
+                    <div><span className="text-cyan-400 font-semibold">[CLIC GAUCHE]</span> : Tirer • <span className="text-cyan-400 font-semibold">[ÉCHAP]</span> : Menu</div>
+                </div>
 
-            {/* Bouton Quitter */}
-            <div className="absolute top-4 right-6 z-30">
+                {/* Bouton Quitter */}
                 <button
-                    onClick={onExit}
-                    className="px-4 py-2 bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-700 hover:border-zinc-500 text-zinc-200 text-xs font-semibold uppercase tracking-wider rounded-xl transition cursor-pointer backdrop-blur-md shadow-lg"
+                    onClick={() => onExitRef.current()}
+                    className="pointer-events-auto px-5 py-2.5 bg-slate-800/90 hover:bg-red-950/80 text-slate-300 hover:text-red-300 border border-slate-700 hover:border-red-700/50 rounded-lg text-xs font-semibold tracking-wider uppercase transition-all shadow-md cursor-pointer"
                 >
-                    ✕ Quitter vers le Menu
+                    Quitter l'entraînement
                 </button>
             </div>
 
-            {/* Overlay d'accueil & Pause */}
+            {/* Overlay d'accueil / pause */}
             {!isLocked && (
-                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/75 backdrop-blur-md text-white pointer-events-auto p-4">
-                    <div className="max-w-lg w-full p-8 bg-zinc-950/95 border border-emerald-500/40 rounded-2xl shadow-2xl text-center">
-                        <div className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full text-xs font-mono font-bold tracking-widest uppercase mb-3">
-                            Arsenal Réaliste • 5 Armes 3D
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center z-50">
+                    <div className="bg-slate-900/95 border border-slate-700 p-8 rounded-xl max-w-md w-full text-center shadow-2xl space-y-6">
+                        <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-2xl font-bold">
+                            🎯
                         </div>
-                        <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-wider mb-2 text-white font-mono">
-                            Armurerie & Monde 3D
-                        </h2>
-                        <p className="text-xs text-zinc-300 mb-6">
-                            Testez 5 modèles d'armes 3D réalistes : <strong>Fusil d'Assaut [1]</strong>, <strong>Sniper AWM [2]</strong>, <strong>Fusil à Pompe [3]</strong>, <strong>Pistolet [4]</strong> et <strong>Lance-Plasma [5]</strong> ou via la molette de la souris.
-                        </p>
-
-                        <div className="space-y-2 mb-6 text-xs text-zinc-300 bg-zinc-900/90 p-4 rounded-xl border border-zinc-800 text-left font-mono">
-                            <div className="flex justify-between py-0.5">
-                                <span className="text-zinc-400">Changer d'arme :</span>
-                                <strong className="text-emerald-400">Touches [1, 2, 3, 4, 5] ou Molette</strong>
-                            </div>
-                            <div className="flex justify-between py-0.5">
-                                <span className="text-zinc-400">Déplacement :</span>
-                                <strong className="text-zinc-100">Z, Q, S, D / Flèches</strong>
-                            </div>
-                            <div className="flex justify-between py-0.5">
-                                <span className="text-zinc-400">Saut & Escalade :</span>
-                                <strong className="text-emerald-400">Espace (grimpez sur voitures & rochers)</strong>
-                            </div>
-                            <div className="flex justify-between py-0.5">
-                                <span className="text-zinc-400">Tir selon l'arme :</span>
-                                <strong className="text-emerald-400">Clic Gauche (Balistique adaptée)</strong>
-                            </div>
-                            <div className="flex justify-between py-0.5">
-                                <span className="text-zinc-400">Libérer la souris :</span>
-                                <strong className="text-zinc-100">Échap (ESC)</strong>
-                            </div>
+                        <div>
+                            <h2 className="text-2xl font-extrabold text-white tracking-wide uppercase">
+                                Stand de Tir Tactique
+                            </h2>
+                            <p className="text-xs text-slate-400 mt-2">
+                                {activeMessage}
+                            </p>
                         </div>
 
-                        <button
-                            onClick={requestLock}
-                            className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-zinc-950 font-black uppercase tracking-wider rounded-xl transition text-sm cursor-pointer shadow-lg shadow-emerald-500/30"
-                        >
-                            ▶ Entrer dans le Monde 3D
-                        </button>
+                        <div className="space-y-3">
+                            <button
+                                onClick={() => {
+                                    const canvas = canvasRef.current;
+                                    if (canvas) canvas.requestPointerLock();
+                                }}
+                                className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-lg text-sm uppercase tracking-wider transition-colors shadow-lg cursor-pointer"
+                            >
+                                Commencer à Tirer
+                            </button>
+                            <button
+                                onClick={() => onExitRef.current()}
+                                className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs uppercase tracking-wider transition-colors cursor-pointer"
+                            >
+                                Retour au Menu Principal
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
