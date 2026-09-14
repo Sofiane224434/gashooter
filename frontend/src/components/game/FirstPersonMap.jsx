@@ -7,6 +7,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { sound } from '../../services/sound.js';
 import { SaveService } from '../../services/saveService.js';
+import { MultiplayerClient } from '../../services/multiplayerClient.js';
 
 export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) {
     const canvasRef = useRef(null);
@@ -15,7 +16,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
 
     const [isLocked, setIsLocked] = useState(false);
     const [isAiming, setIsAiming] = useState(false);
-    const [gameMode, setGameMode] = useState(initialMode); // 'multiplayer' | 'training'
+    const [gameMode, setGameMode] = useState(initialMode);
     const [score, setScore] = useState(0);
     const [playerHp, setPlayerHp] = useState(100);
     const [playerKills, setPlayerKills] = useState(0);
@@ -25,6 +26,8 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
     const [magAmmo, setMagAmmo] = useState(30);
     const [reserveAmmo, setReserveAmmo] = useState(90);
     const [isReloading, setIsReloading] = useState(false);
+    const [connectedPlayersCount, setConnectedPlayersCount] = useState(1);
+    const [networkStatus, setNetworkStatus] = useState('Connexion...');
     const [killFeed, setKillFeed] = useState([]);
     const [hitBanner, setHitBanner] = useState(null);
     const [ammoToast, setAmmoToast] = useState(null);
@@ -79,7 +82,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
         const outputPass = new OutputPass();
         composer.addPass(outputPass);
 
-        // --- 3. ÉCLAIRAGE ---
+        // --- 3. ÉCLAIRAGE HAUTE VISIBILITÉ ---
         const ambientLight = new THREE.AmbientLight(0xffffff, 2.5);
         scene.add(ambientLight);
 
@@ -117,13 +120,11 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             return box;
         };
 
-        // Sol
         const floor = new THREE.Mesh(new THREE.PlaneGeometry(70, 70), floorMat);
         floor.rotation.x = -Math.PI / 2;
         floor.receiveShadow = true;
         scene.add(floor);
 
-        // Marquages
         const addGroundMark = (x, z, w, d, mat = neonCyanMat) => {
             const strip = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat);
             strip.position.set(x, 0.015, z);
@@ -135,7 +136,6 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
         addGroundMark(-18, 0, 0.25, 40, neonOrangeMat);
         addGroundMark(18, 0, 0.25, 40, neonOrangeMat);
 
-        // Murs
         const wallH = 10;
         const addWall = (x, y, z, w, h, d) => {
             const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
@@ -150,7 +150,6 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
         addWall(-35, wallH / 2, 0, 1.5, wallH, 70);
         addWall(35, wallH / 2, 0, 1.5, wallH, 70);
 
-        // Piliers
         const addPillar = (x, z) => {
             const group = new THREE.Group();
             group.position.set(x, 0, z);
@@ -172,7 +171,6 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
         addPillar(-14, 14);
         addPillar(14, 14);
 
-        // Plateformes surélevées
         const addPlatform = (x, y, z, w, h, d) => {
             const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), platformMat);
             mesh.position.set(x, y + h / 2, z);
@@ -193,43 +191,38 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
         addPlatform(20, 0, -20, 8, 2.6, 8);
         addPlatform(0, 0, -24, 10, 3.2, 6);
 
-        // --- 5. COMBATTANTS MULTIJOUEUR AVEC TÊTES DE CIBLES (TARGET-HEAD FIGHTERS) ---
-        const fighters = [];
+        // --- 5. GESTION DES COMBATTANTS AVEC TÊTES DE CIBLES (TARGET-HEAD FIGHTERS) ---
+        const remotePlayersMap = new Map(); // id -> Group
 
-        const createTargetHeadFighter = (id, name, colorHex, spawnPos) => {
+        const createTargetHeadModel = (name, colorHex, spawnPos) => {
             const fighterGroup = new THREE.Group();
             fighterGroup.position.set(spawnPos[0], spawnPos[1], spawnPos[2]);
 
             const armorMat = new THREE.MeshStandardMaterial({ color: colorHex, metalness: 0.7, roughness: 0.3 });
             const darkKevlar = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.7 });
 
-            // 1. Corps / Torse
-            const torsoGeo = new THREE.BoxGeometry(0.7, 0.85, 0.4);
-            const torso = new THREE.Mesh(torsoGeo, armorMat);
+            // Corps / Torse
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.85, 0.4), armorMat);
             torso.position.y = 1.1;
             torso.castShadow = true;
             fighterGroup.add(torso);
 
-            // 2. Jambes
-            const legGeo = new THREE.BoxGeometry(0.25, 0.75, 0.28);
-            const legL = new THREE.Mesh(legGeo, darkKevlar);
+            // Jambes
+            const legL = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.75, 0.28), darkKevlar);
             legL.position.set(-0.2, 0.38, 0);
-            legL.castShadow = true;
             fighterGroup.add(legL);
 
-            const legR = new THREE.Mesh(legGeo, darkKevlar);
+            const legR = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.75, 0.28), darkKevlar);
             legR.position.set(0.2, 0.38, 0);
-            legR.castShadow = true;
             fighterGroup.add(legR);
 
-            // 3. Bras et Arme tenue
-            const armGeo = new THREE.BoxGeometry(0.2, 0.7, 0.22);
-            const armL = new THREE.Mesh(armGeo, armorMat);
+            // Bras & Arme
+            const armL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.7, 0.22), armorMat);
             armL.position.set(-0.48, 1.1, 0.1);
             armL.rotation.x = -Math.PI / 6;
             fighterGroup.add(armL);
 
-            const armR = new THREE.Mesh(armGeo, armorMat);
+            const armR = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.7, 0.22), armorMat);
             armR.position.set(0.48, 1.1, 0.1);
             armR.rotation.x = -Math.PI / 4;
             fighterGroup.add(armR);
@@ -238,37 +231,31 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             gun.position.set(0.42, 0.95, 0.4);
             fighterGroup.add(gun);
 
-            // 4. TÊTE DE CIBLE DE TIR À L'ARC À ANNEAUX CONCENTRIQUES
+            // TÊTE DE CIBLE DE TIR À L'ARC À ANNEAUX CONCENTRIQUES
             const headGroup = new THREE.Group();
             headGroup.position.set(0, 1.85, 0);
 
-            // Disque de tête
-            const headDiscGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.1, 32);
-            headDiscGeo.rotateX(Math.PI / 2);
-            const headDisc = new THREE.Mesh(headDiscGeo, new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 }));
+            const headDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.1, 32), new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 }));
+            headDisc.rotation.x = Math.PI / 2;
             headDisc.castShadow = true;
             headGroup.add(headDisc);
 
-            // Anneaux concentriques : Blanc (Extérieur), Bleu, Rouge, Jaune (Bullseye)
             const ringR = [0.4, 0.3, 0.2, 0.09];
             const ringColors = [0xffffff, 0x0284c7, 0xdc2626, 0xfacc15];
 
             ringR.forEach((r, idx) => {
-                const ringGeo = new THREE.CircleGeometry(r, 32);
-                const ringMaterial = new THREE.MeshBasicMaterial({ color: ringColors[idx], side: THREE.DoubleSide });
-                const rMesh = new THREE.Mesh(ringGeo, ringMaterial);
+                const rMesh = new THREE.Mesh(new THREE.CircleGeometry(r, 32), new THREE.MeshBasicMaterial({ color: ringColors[idx], side: THREE.DoubleSide }));
                 rMesh.position.set(0, 0, 0.055 + idx * 0.002);
                 headGroup.add(rMesh);
             });
 
-            // Bullseye central doré saillant
             const bullseyeCenter = new THREE.Mesh(new THREE.SphereGeometry(0.045, 16, 16), new THREE.MeshBasicMaterial({ color: 0xffffff }));
             bullseyeCenter.position.set(0, 0, 0.065);
             headGroup.add(bullseyeCenter);
 
             fighterGroup.add(headGroup);
 
-            // 5. Barre de vie 3D au-dessus du joueur
+            // Barre de PV 3D
             const hpBarBg = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.12), new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide }));
             hpBarBg.position.set(0, 2.45, 0);
             fighterGroup.add(hpBarBg);
@@ -278,41 +265,152 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             fighterGroup.add(hpBarFill);
 
             fighterGroup.userData = {
-                id,
                 name,
                 hp: 100,
                 maxHp: 100,
-                kills: 0,
-                deaths: 0,
                 isFighter: true,
                 torso,
                 headGroup,
                 hpBarFill,
                 hpBarBg,
-                spawnPos,
-                shootCooldown: Math.random() * 2.5 + 1.0,
-                moveTarget: new THREE.Vector3((Math.random() - 0.5) * 40, 0, (Math.random() - 0.5) * 40),
+                targetPos: new THREE.Vector3(spawnPos[0], spawnPos[1], spawnPos[2]),
+                targetRotY: 0,
                 isAlive: true,
-                respawnTimer: 0
+                isBot: false
             };
 
             scene.add(fighterGroup);
-            fighters.push(fighterGroup);
             return fighterGroup;
         };
 
-        // Création des 3 adversaires rivaux
-        createTargetHeadFighter('bot_1', 'Target-Alpha', 0xdc2626, [-14, 0, -12]);
-        createTargetHeadFighter('bot_2', 'Target-Bravo', 0x9333ea, [14, 0, -14]);
-        createTargetHeadFighter('bot_3', 'Target-Charlie', 0xd97706, [0, 0, -20]);
+        // --- 6. CLIENT MULTIJOUEUR WEBSOCKET ---
+        const mpClient = new MultiplayerClient();
 
-        // --- 6. CAISSES DE MUNITIONS AU SOL ---
+        mpClient.callbacks.onInitState = (data) => {
+            setNetworkStatus(`Connecté au Salon (Slot ${data.mySlot + 1}/4)`);
+            if (data.mySpawn) {
+                camera.position.set(data.mySpawn[0], data.mySpawn[1], data.mySpawn[2]);
+            }
+
+            // Instancier les autres joueurs connectés
+            data.players.forEach((p) => {
+                if (p.id !== data.myId && !remotePlayersMap.has(p.id)) {
+                    const model = createTargetHeadModel(p.name, p.color, p.pos || [0, 1.7, 0]);
+                    remotePlayersMap.set(p.id, model);
+                }
+            });
+
+            // Si moins de 4 joueurs, compléter avec des bots cibles tactiques
+            const totalPlayers = data.players.length;
+            setConnectedPlayersCount(totalPlayers);
+            spawnFillBots(4 - totalPlayers);
+        };
+
+        mpClient.callbacks.onPlayerJoined = (p) => {
+            if (!remotePlayersMap.has(p.id)) {
+                const model = createTargetHeadModel(p.name, p.color, p.pos || [0, 1.7, 0]);
+                remotePlayersMap.set(p.id, model);
+                setConnectedPlayersCount((prev) => prev + 1);
+                setKillFeed((prev) => [`🎮 ${p.name} a rejoint la partie`, ...prev.slice(0, 3)]);
+            }
+        };
+
+        mpClient.callbacks.onPlayerMoved = (data) => {
+            const playerModel = remotePlayersMap.get(data.id);
+            if (playerModel) {
+                playerModel.userData.targetPos.set(data.pos[0], data.pos[1], data.pos[2]);
+                playerModel.userData.targetRotY = data.rotY;
+            }
+        };
+
+        mpClient.callbacks.onPlayerShot = (data) => {
+            spawnBullet(false, new THREE.Vector3(...data.origin), new THREE.Vector3(...data.dir));
+            sound.playGunshot();
+        };
+
+        mpClient.callbacks.onDamageApplied = (data) => {
+            // Mise à jour de la barre de PV du combattant touché
+            if (data.targetId === mpClient.myId) {
+                // Le joueur local a été touché
+                setDamageFlash(true);
+                setTimeout(() => setDamageFlash(false), 200);
+                setPlayerHp(data.newHp);
+
+                if (data.isKill) {
+                    setPlayerDeaths((d) => d + 1);
+                    setKillFeed((prev) => [`💀 ${data.shooterName} vous a éliminé (${data.hitType})`, ...prev.slice(0, 3)]);
+                    setTimeout(() => mpClient.sendRespawn(), 3000);
+                }
+            } else {
+                const targetModel = remotePlayersMap.get(data.targetId);
+                if (targetModel) {
+                    targetModel.userData.hp = data.newHp;
+                    const hpPercent = Math.max(0, data.newHp / 100);
+                    targetModel.userData.hpBarFill.scale.x = hpPercent;
+                    targetModel.userData.hpBarFill.position.x = -(1 - hpPercent) * 0.48;
+
+                    if (data.isKill) {
+                        targetModel.visible = false;
+                        setKillFeed((prev) => [`⚡ ${data.shooterName} a éliminé ${data.targetName}`, ...prev.slice(0, 3)]);
+                    }
+                }
+            }
+        };
+
+        mpClient.callbacks.onPlayerRespawned = (data) => {
+            if (data.id === mpClient.myId) {
+                setPlayerHp(100);
+                if (data.spawnPos) camera.position.set(data.spawnPos[0], data.spawnPos[1], data.spawnPos[2]);
+            } else {
+                const model = remotePlayersMap.get(data.id);
+                if (model) {
+                    model.visible = true;
+                    model.userData.hp = 100;
+                    model.userData.hpBarFill.scale.x = 1;
+                    model.userData.hpBarFill.position.x = 0;
+                    if (data.spawnPos) model.position.set(data.spawnPos[0], data.spawnPos[1], data.spawnPos[2]);
+                }
+            }
+        };
+
+        mpClient.callbacks.onPlayerLeft = (id) => {
+            const model = remotePlayersMap.get(id);
+            if (model) {
+                scene.remove(model);
+                remotePlayersMap.delete(id);
+                setConnectedPlayersCount((prev) => Math.max(1, prev - 1));
+            }
+        };
+
+        mpClient.connect(`Joueur_${Math.floor(Math.random() * 900 + 100)}`, 'global_arena');
+
+        // Bots de remplissage pour garantir 4 combattants
+        const fillBots = [];
+        const spawnFillBots = (count) => {
+            const botNames = ['Target-Alpha', 'Target-Bravo', 'Target-Charlie'];
+            const botColors = [0xdc2626, 0x9333ea, 0xd97706];
+            const botSpawns = [[-14, 0, -12], [14, 0, -14], [0, 0, -20]];
+
+            for (let i = 0; i < Math.min(count, 3); i++) {
+                const botId = `bot_${i}`;
+                if (!remotePlayersMap.has(botId)) {
+                    const bot = createTargetHeadModel(botNames[i], botColors[i], botSpawns[i]);
+                    bot.userData.isBot = true;
+                    bot.userData.id = botId;
+                    bot.userData.shootCooldown = Math.random() * 2.5 + 1.5;
+                    bot.userData.moveTarget = new THREE.Vector3((Math.random() - 0.5) * 40, 0, (Math.random() - 0.5) * 40);
+                    remotePlayersMap.set(botId, bot);
+                    fillBots.push(bot);
+                }
+            }
+        };
+
+        // --- 7. CAISSES DE MUNITIONS AU SOL ---
         const ammoCrates = [];
         const crateMat = new THREE.MeshStandardMaterial({ color: 0x2e4a2b, roughness: 0.5, metalness: 0.4 });
         const iconGlowMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
 
         const crateLocations = [[-12, 0, 6], [12, 0, 6], [-22, 0, -8], [22, 0, -8], [0, 0, 10]];
-
         crateLocations.forEach(([x, z]) => {
             const crateGroup = new THREE.Group();
             crateGroup.position.set(x, 0, z);
@@ -339,7 +437,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             registerBox(box);
         });
 
-        // --- 7. ARME TACTIQUE DU JOUEUR ---
+        // --- 8. ARME TACTIQUE DU JOUEUR ---
         const weaponPivot = new THREE.Group();
         const weaponMeshGroup = new THREE.Group();
 
@@ -394,7 +492,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
         const adsPosition = new THREE.Vector3(-0.24, 0.065, 0.08);
         let isAimingADS = false;
 
-        // --- 8. SYSTÈME DE VRAIES BALLES 3D PHYSIQUES ---
+        // --- 9. BALLES 3D PHYSIQUES & IMPACTS ---
         const bullets = [];
         const bulletGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.45, 8);
         bulletGeo.rotateX(Math.PI / 2);
@@ -429,6 +527,9 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 bullet.position.copy(muzzleWorldPos);
                 camera.getWorldDirection(shootDir);
                 bullet.quaternion.copy(camera.quaternion);
+
+                // Diffuser aux autres joueurs via WebSocket
+                mpClient.sendShoot(muzzleWorldPos, shootDir);
             } else {
                 bullet.position.copy(originPos);
                 shootDir.copy(dirVec);
@@ -446,7 +547,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             });
         };
 
-        // --- 9. SYSTÈME DE MUNITIONS & RECHARGEMENT ---
+        // --- 10. RECHARGEMENT & CLAVIER ---
         let currentMag = 30;
         let currentReserve = 90;
         let reloading = false;
@@ -476,19 +577,13 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             }, 1200);
         };
 
-        // --- 10. CONTRÔLES ---
         const controls = new PointerLockControls(camera, canvas);
-
-        const onLock = () => {
-            setIsLocked(true);
-        };
-        const onUnlock = () => {
+        controls.addEventListener('lock', () => setIsLocked(true));
+        controls.addEventListener('unlock', () => {
             setIsLocked(false);
             isAimingADS = false;
             setIsAiming(false);
-        };
-        controls.addEventListener('lock', onLock);
-        controls.addEventListener('unlock', onUnlock);
+        });
 
         const moveState = { forward: false, backward: false, left: false, right: false, sprint: false };
         const velocity = new THREE.Vector3();
@@ -499,70 +594,28 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 executeReload();
                 return;
             }
-
             switch (e.code) {
-                case 'KeyW':
-                case 'KeyZ':
-                case 'ArrowUp':
-                    moveState.forward = true;
-                    break;
-                case 'KeyS':
-                case 'ArrowDown':
-                    moveState.backward = true;
-                    break;
-                case 'KeyA':
-                case 'KeyQ':
-                case 'ArrowLeft':
-                    moveState.left = true;
-                    break;
-                case 'KeyD':
-                case 'ArrowRight':
-                    moveState.right = true;
-                    break;
-                case 'ShiftLeft':
-                case 'ShiftRight':
-                    moveState.sprint = true;
-                    break;
+                case 'KeyW': case 'KeyZ': case 'ArrowUp': moveState.forward = true; break;
+                case 'KeyS': case 'ArrowDown': moveState.backward = true; break;
+                case 'KeyA': case 'KeyQ': case 'ArrowLeft': moveState.left = true; break;
+                case 'KeyD': case 'ArrowRight': moveState.right = true; break;
+                case 'ShiftLeft': case 'ShiftRight': moveState.sprint = true; break;
                 case 'Space':
-                    if (canJump) {
-                        velocity.y = 8.5;
-                        canJump = false;
-                    }
+                    if (canJump) { velocity.y = 8.5; canJump = false; }
                     break;
                 case 'Escape':
                     if (!controls.isLocked) onExitRef.current();
-                    break;
-                default:
                     break;
             }
         };
 
         const onKeyUp = (e) => {
             switch (e.code) {
-                case 'KeyW':
-                case 'KeyZ':
-                case 'ArrowUp':
-                    moveState.forward = false;
-                    break;
-                case 'KeyS':
-                case 'ArrowDown':
-                    moveState.backward = false;
-                    break;
-                case 'KeyA':
-                case 'KeyQ':
-                case 'ArrowLeft':
-                    moveState.left = false;
-                    break;
-                case 'KeyD':
-                case 'ArrowRight':
-                    moveState.right = false;
-                    break;
-                case 'ShiftLeft':
-                case 'ShiftRight':
-                    moveState.sprint = false;
-                    break;
-                default:
-                    break;
+                case 'KeyW': case 'KeyZ': case 'ArrowUp': moveState.forward = false; break;
+                case 'KeyS': case 'ArrowDown': moveState.backward = false; break;
+                case 'KeyA': case 'KeyQ': case 'ArrowLeft': moveState.left = false; break;
+                case 'KeyD': case 'ArrowRight': moveState.right = false; break;
+                case 'ShiftLeft': case 'ShiftRight': moveState.sprint = false; break;
             }
         };
 
@@ -571,7 +624,6 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
 
         const fireWeapon = () => {
             if (!controls.isLocked || reloading) return;
-
             if (currentMag <= 0) {
                 sound.playDryFire();
                 if (currentReserve > 0) executeReload();
@@ -620,40 +672,34 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
         window.addEventListener('mouseup', onMouseUp);
         window.addEventListener('contextmenu', onContextMenu);
 
-        // --- 11. GESTION DES DÉGÂTS PAR ZONE & BULLSEYE ---
-        const handleFighterHit = (fighter, hitPoint) => {
-            if (!fighter.userData.isAlive) return;
-
+        // --- 11. CALCUL DÉGÂTS PAR ZONE & BULLSEYE RÉEL ---
+        const handleTargetHit = (fighter, hitPoint, targetId) => {
             sound.playHitmarker();
             setShotsHit((prev) => prev + 1);
 
-            // Calcul de la distance par rapport au centre de la tête de cible
             const headWorldPos = new THREE.Vector3();
             fighter.userData.headGroup.getWorldPosition(headWorldPos);
-
             const distToHeadCenter = hitPoint.distanceTo(headWorldPos);
-            let damage = 20; // Dégâts de base torse
+
+            let damage = 20;
             let hitType = 'CORPS (20 DMG)';
             let isHeadshot = false;
 
             if (distToHeadCenter <= 0.45) {
                 isHeadshot = true;
                 if (distToHeadCenter <= 0.10) {
-                    // BULLSEYE PARFAIT AU CENTRE : 100 DÉGÂTS (ONE-SHOT KILL !)
+                    // BULLSEYE PARFAIT AU CENTRE : 100 DMG (ONE-SHOT KILL !)
                     damage = 100;
                     hitType = '🎯 BULLSEYE HEADSHOT ! (100 DMG)';
                 } else if (distToHeadCenter <= 0.24) {
-                    // ANNEAU ROUGE
                     damage = 65;
-                    hitType = '🔴 ANNEAU ROUGE TÊTE (65 DMG)';
+                    hitType = '🔴 ANNEAU ROUGE (65 DMG)';
                 } else if (distToHeadCenter <= 0.36) {
-                    // ANNEAU BLEU
                     damage = 40;
-                    hitType = '🔵 ANNEAU BLEU TÊTE (40 DMG)';
+                    hitType = '🔵 ANNEAU BLEU (40 DMG)';
                 } else {
-                    // ANNEAU BLANC EXTÉRIEUR
                     damage = 25;
-                    hitType = '⚪ BORD DE CIBLE TÊTE (25 DMG)';
+                    hitType = '⚪ BORD DE CIBLE (25 DMG)';
                 }
             } else if (hitPoint.y < headWorldPos.y - 0.9) {
                 damage = 15;
@@ -663,43 +709,15 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             setHitBanner({ type: hitType, isHeadshot, damage });
             setTimeout(() => setHitBanner(null), 1800);
 
-            // Application des dégâts
-            fighter.userData.hp = Math.max(0, fighter.userData.hp - damage);
-            const hpPercent = fighter.userData.hp / fighter.userData.maxHp;
-            fighter.userData.hpBarFill.scale.x = hpPercent;
-            fighter.userData.hpBarFill.position.x = -(1 - hpPercent) * 0.48;
+            // Transmettre l'impact via WebSocket pour synchronisation multi
+            mpClient.sendHit(targetId, damage, hitType, hitPoint);
 
-            if (hpPercent < 0.35) {
-                fighter.userData.hpBarFill.material.color.setHex(0xef4444);
-            } else if (hpPercent < 0.65) {
-                fighter.userData.hpBarFill.material.color.setHex(0xf59e0b);
-            }
-
-            // Élimination du combattant
-            if (fighter.userData.hp <= 0) {
-                fighter.userData.isAlive = false;
-                fighter.userData.respawnTimer = 4.0;
-                fighter.visible = false;
-
-                setPlayerKills((prev) => prev + 1);
-                setScore((prev) => {
-                    const newScore = prev + (isHeadshot ? 500 : 250);
-                    SaveService.saveGameSession({
-                        score: newScore,
-                        shotsFired: 0,
-                        shotsHit: 1,
-                        targetsDestroyed: 1
-                    });
-                    return newScore;
-                });
-
-                const killMsg = `${isHeadshot ? '🎯 [BULLSEYE]' : '⚡'} Vous avez éliminé ${fighter.userData.name} (${damage} DMG)`;
-                setKillFeed((prev) => [killMsg, ...prev.slice(0, 3)]);
-            }
+            setScore((prev) => prev + (isHeadshot ? (damage === 100 ? 500 : 250) : 100));
         };
 
-        // --- 12. BOUCLE PRINCIPALE, IA ET PHYSIQUE ---
+        // --- 12. BOUCLE PRINCIPALE ---
         let prevTime = performance.now();
+        let lastSyncTime = 0;
         let bobTimer = 0;
         let animationFrameId;
 
@@ -710,53 +728,49 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             const delta = Math.min((time - prevTime) / 1000, 0.1);
             prevTime = time;
 
-            // IA des Combattants Têtes de Cibles
-            fighters.forEach((f) => {
-                if (!f.userData.isAlive) {
-                    f.userData.respawnTimer -= delta;
-                    if (f.userData.respawnTimer <= 0) {
-                        f.userData.isAlive = true;
-                        f.userData.hp = 100;
-                        f.userData.hpBarFill.scale.x = 1;
-                        f.userData.hpBarFill.position.x = 0;
-                        f.userData.hpBarFill.material.color.setHex(0x10b981);
-                        f.position.set((Math.random() - 0.5) * 40, 0, -10 - Math.random() * 20);
-                        f.visible = true;
+            // Synchronisation réseau du joueur local (25 fois par seconde)
+            if (controls.isLocked && time - lastSyncTime > 40) {
+                lastSyncTime = time;
+                const camRotY = camera.rotation.y;
+                mpClient.sendMove(camera.position, camRotY, camera.rotation.x, isAimingADS);
+            }
+
+            // Interpolation et mise à jour des combattants distants et bots
+            for (const [id, f] of remotePlayersMap.entries()) {
+                if (f.userData.isBot) {
+                    // Logique locale pour les bots
+                    f.userData.headGroup.lookAt(camera.position.x, 1.85, camera.position.z);
+                    f.userData.hpBarBg.lookAt(camera.position);
+                    f.userData.hpBarFill.lookAt(camera.position);
+
+                    const distToMove = f.position.distanceTo(f.userData.moveTarget);
+                    if (distToMove < 2.0) {
+                        f.userData.moveTarget.set((Math.random() - 0.5) * 44, 0, (Math.random() - 0.5) * 44);
+                    } else {
+                        const moveDir = new THREE.Vector3().subVectors(f.userData.moveTarget, f.position).normalize();
+                        f.position.addScaledVector(moveDir, delta * 3.5);
+                        f.lookAt(f.userData.moveTarget.x, f.position.y, f.userData.moveTarget.z);
                     }
-                    return;
-                }
 
-                // La tête de cible et la barre de PV s'orientent vers la caméra du joueur
-                f.userData.headGroup.lookAt(camera.position.x, 1.85, camera.position.z);
-                f.userData.hpBarBg.lookAt(camera.position);
-                f.userData.hpBarFill.lookAt(camera.position);
-
-                // Déplacement IA vers sa cible aléatoire
-                const distToMove = f.position.distanceTo(f.userData.moveTarget);
-                if (distToMove < 2.0) {
-                    f.userData.moveTarget.set((Math.random() - 0.5) * 44, 0, (Math.random() - 0.5) * 44);
+                    f.userData.shootCooldown -= delta;
+                    if (f.userData.shootCooldown <= 0) {
+                        f.userData.shootCooldown = Math.random() * 3.5 + 2.0;
+                        const shootOrigin = f.position.clone();
+                        shootOrigin.y = 1.2;
+                        const targetPlayerPos = camera.position.clone();
+                        targetPlayerPos.y -= 0.3;
+                        const dirToPlayer = new THREE.Vector3().subVectors(targetPlayerPos, shootOrigin).normalize();
+                        spawnBullet(false, shootOrigin, dirToPlayer);
+                    }
                 } else {
-                    const moveDir = new THREE.Vector3().subVectors(f.userData.moveTarget, f.position).normalize();
-                    f.position.addScaledVector(moveDir, delta * 3.5);
-                    f.lookAt(f.userData.moveTarget.x, f.position.y, f.userData.moveTarget.z);
+                    // Joueurs humains distants
+                    f.position.lerp(f.userData.targetPos, delta * 12);
+                    f.rotation.y = THREE.MathUtils.lerp(f.rotation.y, f.userData.targetRotY, delta * 12);
+                    f.userData.headGroup.lookAt(camera.position.x, 1.85, camera.position.z);
+                    f.userData.hpBarBg.lookAt(camera.position);
+                    f.userData.hpBarFill.lookAt(camera.position);
                 }
-
-                // IA Tire sur le joueur si dans son champ de vision
-                f.userData.shootCooldown -= delta;
-                if (f.userData.shootCooldown <= 0) {
-                    f.userData.shootCooldown = Math.random() * 3.0 + 2.0;
-
-                    const shootOrigin = f.position.clone();
-                    shootOrigin.y = 1.2;
-
-                    const targetPlayerPos = camera.position.clone();
-                    targetPlayerPos.y -= 0.3;
-
-                    const dirToPlayer = new THREE.Vector3().subVectors(targetPlayerPos, shootOrigin).normalize();
-                    // Tir IA
-                    spawnBullet(false, shootOrigin, dirToPlayer);
-                }
-            });
+            }
 
             // Caisses de munitions
             ammoCrates.forEach((c) => {
@@ -787,7 +801,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 }
             });
 
-            // Physique des Balles 3D & Détection des impacts
+            // Physique des Balles 3D
             for (let i = bullets.length - 1; i >= 0; i--) {
                 const b = bullets[i];
                 const stepDist = b.speed * delta;
@@ -807,17 +821,19 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                         createSparks(hit.point);
 
                         if (b.fromPlayer) {
-                            // Vérifier si un combattant est touché
-                            let obj = hit.object;
-                            while (obj.parent && !obj.userData?.isFighter && obj.parent !== scene) {
-                                obj = obj.parent;
-                            }
-
-                            if (obj && obj.userData && obj.userData.isFighter) {
-                                handleFighterHit(obj, hit.point);
+                            // Chercher si un combattant est touché
+                            for (const [targetId, f] of remotePlayersMap.entries()) {
+                                let obj = hit.object;
+                                while (obj && obj !== scene) {
+                                    if (obj === f) {
+                                        handleTargetHit(f, hit.point, targetId);
+                                        break;
+                                    }
+                                    obj = obj.parent;
+                                }
                             }
                         } else {
-                            // Balle ennemie touchant le joueur
+                            // Dégât reçu par le joueur local
                             const distToCamera = hit.point.distanceTo(camera.position);
                             if (distToCamera < 1.4) {
                                 setDamageFlash(true);
@@ -828,6 +844,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                                     if (nextHp <= 0) {
                                         setPlayerDeaths((d) => d + 1);
                                         camera.position.set((Math.random() - 0.5) * 30, 1.7, 20);
+                                        mpClient.sendRespawn();
                                         return 100;
                                     }
                                     return nextHp;
@@ -844,7 +861,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 }
             }
 
-            // Particules d'étincelles
+            // Particules
             for (let i = sparks.length - 1; i >= 0; i--) {
                 const s = sparks[i];
                 s.life -= delta * 2;
@@ -967,8 +984,9 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             window.removeEventListener('mousedown', onMouseDown);
             window.removeEventListener('mouseup', onMouseUp);
             window.removeEventListener('contextmenu', onContextMenu);
-            controls.removeEventListener('lock', onLock);
-            controls.removeEventListener('unlock', onUnlock);
+            controls.removeEventListener('lock', () => setIsLocked(true));
+            controls.removeEventListener('unlock', () => setIsLocked(false));
+            mpClient.disconnect();
             controls.dispose();
             renderer.dispose();
         };
@@ -1053,6 +1071,11 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 </div>
 
                 <div className="flex items-center space-x-3">
+                    <div className="bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 px-3.5 py-1.5 rounded-lg text-xs font-semibold tracking-wide flex items-center space-x-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                        <span>MULTIJOUEUR EN LIGNE • {connectedPlayersCount} / 4 JOUEURS</span>
+                    </div>
+
                     {ammoToast && (
                         <div className="bg-amber-500/20 border border-amber-500/50 text-amber-300 px-3.5 py-1.5 rounded-lg text-xs font-bold tracking-wider flex items-center space-x-1.5 animate-pulse shadow-lg">
                             <span>📦</span>
@@ -1065,10 +1088,6 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                             ADS ACTIF • ZOOM 1.8X
                         </div>
                     )}
-
-                    <div className="bg-slate-900/85 backdrop-blur border border-slate-700/70 px-4 py-2.5 rounded-lg text-xs tracking-wider text-slate-300">
-                        ARÈNE 4 JOUEURS • <span className="text-cyan-400 font-medium">GASHOOTER</span>
-                    </div>
                 </div>
             </div>
 
@@ -1125,14 +1144,14 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                         </div>
                         <div>
                             <h2 className="text-2xl font-extrabold text-white tracking-wide uppercase">
-                                Arène 4 Joueurs • Têtes de Cibles
+                                Arène Multijoueur Temps Réel (4 Joueurs)
                             </h2>
                             <p className="text-xs text-slate-400 mt-2">
-                                4 Combattants dans l'arène. Visez le centre de la cible pour infliger le maximum de dégâts !
+                                {networkStatus} • Connectez plusieurs navigateurs ou appareils pour jouer ensemble en direct !
                             </p>
                         </div>
 
-                        {/* Barème de Dégâts par Zone */}
+                        {/* Barème des Dégâts */}
                         <div className="bg-slate-800/80 border border-slate-700/80 rounded-lg p-3.5 text-left text-xs space-y-2 text-slate-300">
                             <div className="text-[10px] uppercase font-bold text-cyan-400 tracking-wider">Barème des Dégâts par Zone</div>
                             <div className="flex items-center justify-between text-amber-300 font-bold">
@@ -1161,7 +1180,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                                 }}
                                 className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-lg text-sm uppercase tracking-wider transition-colors shadow-lg cursor-pointer"
                             >
-                                Entrer dans l'Arène
+                                Entrer dans la Partie
                             </button>
                             <button
                                 onClick={() => onExitRef.current()}

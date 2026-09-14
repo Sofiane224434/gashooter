@@ -1,14 +1,19 @@
 // server.js
 import 'dotenv/config';
+import http from 'http';
 import express from 'express';
 import cors from 'cors';
 import { testConnection } from './src/config/db.js';
 import authRoutes from './src/routes/auth.routes.js';
 import emailRoutes from './src/routes/email.routes.js';
+import { setupMultiplayerServer } from './src/services/multiplayerServer.js';
+
 const app = express();
 const PORT = process.env.PORT || 5000;
+
 // Connexion BDD
 testConnection();
+
 // Middlewares
 const allowedOrigins = [
     'http://localhost:5173',
@@ -43,6 +48,7 @@ app.get(['/', '/api/health', '/api/site-state'], (req, res) => {
     res.json({
         status: 'online',
         service: 'gashooter-api',
+        multiplayer: 'enabled',
         timestamp: new Date().toISOString()
     });
 });
@@ -50,9 +56,14 @@ app.get(['/', '/api/health', '/api/site-state'], (req, res) => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/email', emailRoutes);
+
 // 404
 app.use((req, res) => res.status(404).json({ error: 'Route non trouvée' }));
-// Démarrage
-app.listen(PORT, () => {
-    console.log(`Serveur sur http://localhost:${PORT}`);
+
+// Création serveur HTTP + WebSocket Multijoueur
+const server = http.createServer(app);
+setupMultiplayerServer(server);
+
+server.listen(PORT, () => {
+    console.log(`Serveur API + WebSocket Multijoueur démarré sur le port ${PORT}`);
 });
