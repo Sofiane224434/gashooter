@@ -8,23 +8,28 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { sound } from '../../services/sound.js';
 import { SaveService } from '../../services/saveService.js';
 
-export default function FirstPersonMap({ onExit }) {
+export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) {
     const canvasRef = useRef(null);
     const onExitRef = useRef(onExit);
     onExitRef.current = onExit;
 
     const [isLocked, setIsLocked] = useState(false);
     const [isAiming, setIsAiming] = useState(false);
+    const [gameMode, setGameMode] = useState(initialMode); // 'multiplayer' | 'training'
     const [score, setScore] = useState(0);
+    const [playerHp, setPlayerHp] = useState(100);
+    const [playerKills, setPlayerKills] = useState(0);
+    const [playerDeaths, setPlayerDeaths] = useState(0);
     const [shotsFired, setShotsFired] = useState(0);
     const [shotsHit, setShotsHit] = useState(0);
     const [magAmmo, setMagAmmo] = useState(30);
     const [reserveAmmo, setReserveAmmo] = useState(90);
     const [isReloading, setIsReloading] = useState(false);
-    const [savedStats, setSavedStats] = useState(() => SaveService.getSaveData());
-    const [saveToast, setSaveToast] = useState(false);
+    const [killFeed, setKillFeed] = useState([]);
+    const [hitBanner, setHitBanner] = useState(null);
     const [ammoToast, setAmmoToast] = useState(null);
-    const [activeMessage, setActiveMessage] = useState('Cliquez pour verrouiller la vue et viser');
+    const [damageFlash, setDamageFlash] = useState(false);
+    const [savedStats, setSavedStats] = useState(() => SaveService.getSaveData());
 
     const maxMag = 30;
 
@@ -43,7 +48,7 @@ export default function FirstPersonMap({ onExit }) {
             0.1,
             500
         );
-        camera.position.set(0, 1.7, 20);
+        camera.position.set(0, 1.7, 22);
 
         const renderer = new THREE.WebGLRenderer({
             canvas: canvas,
@@ -74,7 +79,7 @@ export default function FirstPersonMap({ onExit }) {
         const outputPass = new OutputPass();
         composer.addPass(outputPass);
 
-        // --- 3. ÉCLAIRAGE HAUTE VISIBILITÉ ---
+        // --- 3. ÉCLAIRAGE ---
         const ambientLight = new THREE.AmbientLight(0xffffff, 2.5);
         scene.add(ambientLight);
 
@@ -96,7 +101,7 @@ export default function FirstPersonMap({ onExit }) {
         skyFill.position.set(-25, 20, -25);
         scene.add(skyFill);
 
-        // --- 4. MATÉRIAUX & DÉCORS ---
+        // --- 4. GÉOMÉTRIE & MATÉRIAUX DE L'ARÈNE ---
         const floorMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5, metalness: 0.2 });
         const wallMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.6, metalness: 0.3 });
         const columnMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.35, metalness: 0.8 });
@@ -112,18 +117,28 @@ export default function FirstPersonMap({ onExit }) {
             return box;
         };
 
-        // Sol principal
-        const floorGeo = new THREE.PlaneGeometry(70, 70);
-        const floor = new THREE.Mesh(floorGeo, floorMat);
+        // Sol
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(70, 70), floorMat);
         floor.rotation.x = -Math.PI / 2;
         floor.receiveShadow = true;
         scene.add(floor);
 
-        // Murs d'enceinte
+        // Marquages
+        const addGroundMark = (x, z, w, d, mat = neonCyanMat) => {
+            const strip = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat);
+            strip.position.set(x, 0.015, z);
+            strip.rotation.x = -Math.PI / 2;
+            scene.add(strip);
+        };
+        addGroundMark(0, -10, 50, 0.25, neonCyanMat);
+        addGroundMark(0, 10, 50, 0.25, neonCyanMat);
+        addGroundMark(-18, 0, 0.25, 40, neonOrangeMat);
+        addGroundMark(18, 0, 0.25, 40, neonOrangeMat);
+
+        // Murs
         const wallH = 10;
         const addWall = (x, y, z, w, h, d) => {
-            const geo = new THREE.BoxGeometry(w, h, d);
-            const wall = new THREE.Mesh(geo, wallMat);
+            const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
             wall.position.set(x, y, z);
             wall.receiveShadow = true;
             wall.castShadow = true;
@@ -134,19 +149,6 @@ export default function FirstPersonMap({ onExit }) {
         addWall(0, wallH / 2, 35, 70, wallH, 1.5);
         addWall(-35, wallH / 2, 0, 1.5, wallH, 70);
         addWall(35, wallH / 2, 0, 1.5, wallH, 70);
-
-        // Marquages au sol
-        const addGroundMark = (x, z, w, d, mat = neonCyanMat) => {
-            const geo = new THREE.PlaneGeometry(w, d);
-            const strip = new THREE.Mesh(geo, mat);
-            strip.position.set(x, 0.015, z);
-            strip.rotation.x = -Math.PI / 2;
-            scene.add(strip);
-        };
-        addGroundMark(0, -10, 50, 0.25, neonCyanMat);
-        addGroundMark(0, 10, 50, 0.25, neonCyanMat);
-        addGroundMark(-18, 0, 0.25, 40, neonOrangeMat);
-        addGroundMark(18, 0, 0.25, 40, neonOrangeMat);
 
         // Piliers
         const addPillar = (x, z) => {
@@ -172,16 +174,14 @@ export default function FirstPersonMap({ onExit }) {
 
         // Plateformes surélevées
         const addPlatform = (x, y, z, w, h, d) => {
-            const geo = new THREE.BoxGeometry(w, h, d);
-            const mesh = new THREE.Mesh(geo, platformMat);
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), platformMat);
             mesh.position.set(x, y + h / 2, z);
             mesh.castShadow = true;
             mesh.receiveShadow = true;
             scene.add(mesh);
             registerBox(mesh);
 
-            const rampGeo = new THREE.BoxGeometry(w, 0.4, 4);
-            const ramp = new THREE.Mesh(rampGeo, platformMat);
+            const ramp = new THREE.Mesh(new THREE.BoxGeometry(w, 0.4, 4), platformMat);
             ramp.position.set(x, (y + h) / 2, z + d / 2 + 1.8);
             ramp.rotation.x = -Math.atan2(y + h, 4);
             ramp.castShadow = true;
@@ -193,195 +193,138 @@ export default function FirstPersonMap({ onExit }) {
         addPlatform(20, 0, -20, 8, 2.6, 8);
         addPlatform(0, 0, -24, 10, 3.2, 6);
 
-        // --- 5. CIBLES REALISTES DE TIR À L'ARC & STAND DE TIR (DIFFÉRENTS NIVEAUX) ---
-        const targetObjects = [];
+        // --- 5. COMBATTANTS MULTIJOUEUR AVEC TÊTES DE CIBLES (TARGET-HEAD FIGHTERS) ---
+        const fighters = [];
 
-        // Constructeur de Cible Circulaire Classique à Anneaux (Tir à l'arc)
-        const createArcheryTarget = (scoreVal, scale = 1.0, isSpecial = false) => {
-            const targetGroup = new THREE.Group();
+        const createTargetHeadFighter = (id, name, colorHex, spawnPos) => {
+            const fighterGroup = new THREE.Group();
+            fighterGroup.position.set(spawnPos[0], spawnPos[1], spawnPos[2]);
 
-            // Trépied / Support en bois & acier
-            const woodMat = new THREE.MeshStandardMaterial({ color: 0x5c3a21, roughness: 0.8 });
-            const standL = new THREE.Mesh(new THREE.CylinderGeometry(0.04 * scale, 0.04 * scale, 2.6 * scale, 8), woodMat);
-            standL.position.set(-0.5 * scale, 1.2 * scale, -0.2 * scale);
-            standL.rotation.z = -0.15;
-            standL.rotation.x = -0.1;
-            targetGroup.add(standL);
+            const armorMat = new THREE.MeshStandardMaterial({ color: colorHex, metalness: 0.7, roughness: 0.3 });
+            const darkKevlar = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.7 });
 
-            const standR = new THREE.Mesh(new THREE.CylinderGeometry(0.04 * scale, 0.04 * scale, 2.6 * scale, 8), woodMat);
-            standR.position.set(0.5 * scale, 1.2 * scale, -0.2 * scale);
-            standR.rotation.z = 0.15;
-            standR.rotation.x = -0.1;
-            targetGroup.add(standR);
+            // 1. Corps / Torse
+            const torsoGeo = new THREE.BoxGeometry(0.7, 0.85, 0.4);
+            const torso = new THREE.Mesh(torsoGeo, armorMat);
+            torso.position.y = 1.1;
+            torso.castShadow = true;
+            fighterGroup.add(torso);
 
-            const standBack = new THREE.Mesh(new THREE.CylinderGeometry(0.035 * scale, 0.035 * scale, 2.4 * scale, 8), woodMat);
-            standBack.position.set(0, 1.1 * scale, -0.7 * scale);
-            standBack.rotation.x = 0.35;
-            targetGroup.add(standBack);
+            // 2. Jambes
+            const legGeo = new THREE.BoxGeometry(0.25, 0.75, 0.28);
+            const legL = new THREE.Mesh(legGeo, darkKevlar);
+            legL.position.set(-0.2, 0.38, 0);
+            legL.castShadow = true;
+            fighterGroup.add(legL);
 
-            // Disque cible principal (Paille compressée / Base)
-            const baseGeo = new THREE.CylinderGeometry(0.9 * scale, 0.9 * scale, 0.12 * scale, 32);
-            baseGeo.rotateX(Math.PI / 2);
-            const baseMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.7 });
-            const baseDisc = new THREE.Mesh(baseGeo, baseMat);
-            baseDisc.position.set(0, 1.7 * scale, 0);
-            baseDisc.castShadow = true;
-            targetGroup.add(baseDisc);
+            const legR = new THREE.Mesh(legGeo, darkKevlar);
+            legR.position.set(0.2, 0.38, 0);
+            legR.castShadow = true;
+            fighterGroup.add(legR);
 
-            // Anneaux concentriques de couleur (Tir à l'arc officiel)
-            const ringColors = isSpecial
-                ? [0x1e1b4b, 0x4338ca, 0x6366f1, 0xa855f7, 0xfacc15] // Spécial Élite Violet/Or
-                : [0xffffff, 0x1e293b, 0x0284c7, 0xdc2626, 0xfacc15]; // Classique Blanc/Noir/Bleu/Rouge/Jaune
+            // 3. Bras et Arme tenue
+            const armGeo = new THREE.BoxGeometry(0.2, 0.7, 0.22);
+            const armL = new THREE.Mesh(armGeo, armorMat);
+            armL.position.set(-0.48, 1.1, 0.1);
+            armL.rotation.x = -Math.PI / 6;
+            fighterGroup.add(armL);
 
-            const rings = [0.85, 0.68, 0.50, 0.32, 0.15];
-            rings.forEach((r, idx) => {
-                const ringGeo = new THREE.CircleGeometry(r * scale, 32);
+            const armR = new THREE.Mesh(armGeo, armorMat);
+            armR.position.set(0.48, 1.1, 0.1);
+            armR.rotation.x = -Math.PI / 4;
+            fighterGroup.add(armR);
+
+            const gun = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.65), darkKevlar);
+            gun.position.set(0.42, 0.95, 0.4);
+            fighterGroup.add(gun);
+
+            // 4. TÊTE DE CIBLE DE TIR À L'ARC À ANNEAUX CONCENTRIQUES
+            const headGroup = new THREE.Group();
+            headGroup.position.set(0, 1.85, 0);
+
+            // Disque de tête
+            const headDiscGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.1, 32);
+            headDiscGeo.rotateX(Math.PI / 2);
+            const headDisc = new THREE.Mesh(headDiscGeo, new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 }));
+            headDisc.castShadow = true;
+            headGroup.add(headDisc);
+
+            // Anneaux concentriques : Blanc (Extérieur), Bleu, Rouge, Jaune (Bullseye)
+            const ringR = [0.4, 0.3, 0.2, 0.09];
+            const ringColors = [0xffffff, 0x0284c7, 0xdc2626, 0xfacc15];
+
+            ringR.forEach((r, idx) => {
+                const ringGeo = new THREE.CircleGeometry(r, 32);
                 const ringMaterial = new THREE.MeshBasicMaterial({ color: ringColors[idx], side: THREE.DoubleSide });
                 const rMesh = new THREE.Mesh(ringGeo, ringMaterial);
-                rMesh.position.set(0, 1.7 * scale, 0.065 * scale + idx * 0.001);
-                targetGroup.add(rMesh);
+                rMesh.position.set(0, 0, 0.055 + idx * 0.002);
+                headGroup.add(rMesh);
             });
 
-            // Bullseye central lumineux
-            const bullseyeGeo = new THREE.SphereGeometry(0.08 * scale, 16, 16);
-            const bullseyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-            const bullseye = new THREE.Mesh(bullseyeGeo, bullseyeMat);
-            bullseye.position.set(0, 1.7 * scale, 0.08 * scale);
-            targetGroup.add(bullseye);
+            // Bullseye central doré saillant
+            const bullseyeCenter = new THREE.Mesh(new THREE.SphereGeometry(0.045, 16, 16), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+            bullseyeCenter.position.set(0, 0, 0.065);
+            headGroup.add(bullseyeCenter);
 
-            targetGroup.userData = {
-                isTarget: true,
-                scoreValue: scoreVal,
-                baseDisc,
-                bullseye,
-                initialY: 0,
-                isSpecial
+            fighterGroup.add(headGroup);
+
+            // 5. Barre de vie 3D au-dessus du joueur
+            const hpBarBg = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.12), new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide }));
+            hpBarBg.position.set(0, 2.45, 0);
+            fighterGroup.add(hpBarBg);
+
+            const hpBarFill = new THREE.Mesh(new THREE.PlaneGeometry(0.96, 0.08), new THREE.MeshBasicMaterial({ color: 0x10b981, side: THREE.DoubleSide }));
+            hpBarFill.position.set(0, 2.45, 0.005);
+            fighterGroup.add(hpBarFill);
+
+            fighterGroup.userData = {
+                id,
+                name,
+                hp: 100,
+                maxHp: 100,
+                kills: 0,
+                deaths: 0,
+                isFighter: true,
+                torso,
+                headGroup,
+                hpBarFill,
+                hpBarBg,
+                spawnPos,
+                shootCooldown: Math.random() * 2.5 + 1.0,
+                moveTarget: new THREE.Vector3((Math.random() - 0.5) * 40, 0, (Math.random() - 0.5) * 40),
+                isAlive: true,
+                respawnTimer: 0
             };
 
-            return targetGroup;
+            scene.add(fighterGroup);
+            fighters.push(fighterGroup);
+            return fighterGroup;
         };
 
-        // Constructeur de Cible Diamant / Losange Tactique (Niveau Moyen / Difficile)
-        const createDiamondTarget = (scoreVal, scale = 1.0) => {
-            const group = new THREE.Group();
+        // Création des 3 adversaires rivaux
+        createTargetHeadFighter('bot_1', 'Target-Alpha', 0xdc2626, [-14, 0, -12]);
+        createTargetHeadFighter('bot_2', 'Target-Bravo', 0x9333ea, [14, 0, -14]);
+        createTargetHeadFighter('bot_3', 'Target-Charlie', 0xd97706, [0, 0, -20]);
 
-            const postMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.3 });
-            const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * scale, 0.05 * scale, 2.2 * scale, 12), postMat);
-            post.position.y = 1.1 * scale;
-            group.add(post);
-
-            // Losange / Diamant pivotant
-            const diamondGeo = new THREE.BoxGeometry(0.9 * scale, 0.9 * scale, 0.08 * scale);
-            const diamondMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.3, metalness: 0.8 });
-            const diamond = new THREE.Mesh(diamondGeo, diamondMat);
-            diamond.position.set(0, 1.9 * scale, 0);
-            diamond.rotation.z = Math.PI / 4;
-            diamond.castShadow = true;
-            group.add(diamond);
-
-            // Bords néon cyan & cœur orange
-            const innerGeo = new THREE.BoxGeometry(0.55 * scale, 0.55 * scale, 0.09 * scale);
-            const innerMat = new THREE.MeshBasicMaterial({ color: 0xf97316 });
-            const inner = new THREE.Mesh(innerGeo, innerMat);
-            inner.position.set(0, 1.9 * scale, 0.005 * scale);
-            inner.rotation.z = Math.PI / 4;
-            group.add(inner);
-
-            const centerGeo = new THREE.SphereGeometry(0.1 * scale, 16, 16);
-            const centerMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-            const center = new THREE.Mesh(centerGeo, centerMat);
-            center.position.set(0, 1.9 * scale, 0.06 * scale);
-            group.add(center);
-
-            group.userData = {
-                isTarget: true,
-                scoreValue: scoreVal,
-                diamond,
-                center,
-                initialY: 0,
-                isDiamond: true
-            };
-
-            return group;
-        };
-
-        // Configuration des 10 cibles avec difficultés et emplacements variés
-        const targetConfigs = [
-            // 1 & 2 : Cibles Tir à l'arc Standard Proches (100 pts)
-            { type: 'archery', pos: [-8, 0, -10], score: 100, scale: 1.1 },
-            { type: 'archery', pos: [8, 0, -10], score: 100, scale: 1.1 },
-            // 3 & 4 : Cibles Diamant Moyenne Portée (200 pts)
-            { type: 'diamond', pos: [-16, 0, -18], score: 200, scale: 1.0 },
-            { type: 'diamond', pos: [16, 0, -18], score: 200, scale: 1.0 },
-            // 5 & 6 : Cibles Tir à l'arc sur Plateformes Hautes (300 pts)
-            { type: 'archery', pos: [-20, 2.2, -20], score: 300, scale: 0.9 },
-            { type: 'archery', pos: [20, 2.6, -20], score: 300, scale: 0.9 },
-            // 7 : Cible Élite Spéciale Fond de Scène (500 pts)
-            { type: 'archery_special', pos: [0, 3.2, -24], score: 500, scale: 1.2, isSpecial: true },
-            // 8 & 9 : Cibles Latérales Flancs (150 pts)
-            { type: 'diamond', pos: [-24, 0, 2], score: 150, scale: 0.95 },
-            { type: 'diamond', pos: [24, 0, 2], score: 150, scale: 0.95 },
-            // 10 : Cible Tir à l'arc Proche Entraînement (50 pts)
-            { type: 'archery', pos: [0, 0, -6], score: 50, scale: 1.2 }
-        ];
-
-        targetConfigs.forEach((cfg, idx) => {
-            let tGroup;
-            if (cfg.type === 'diamond') {
-                tGroup = createDiamondTarget(cfg.score, cfg.scale);
-            } else {
-                tGroup = createArcheryTarget(cfg.score, cfg.scale, cfg.isSpecial);
-            }
-            tGroup.position.set(cfg.pos[0], cfg.pos[1], cfg.pos[2]);
-            tGroup.userData.index = idx;
-            tGroup.userData.timeOffset = idx * 0.7;
-
-            scene.add(tGroup);
-            targetObjects.push(tGroup);
-            registerBox(tGroup);
-        });
-
-        // --- 6. CAISSES DE MUNITIONS AU SOL (AMMO SUPPLY CRATES) ---
+        // --- 6. CAISSES DE MUNITIONS AU SOL ---
         const ammoCrates = [];
-        const crateMat = new THREE.MeshStandardMaterial({ color: 0x2e4a2b, roughness: 0.5, metalness: 0.4 }); // Vert militaire
-        const crateCornerMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.3, metalness: 0.8 });
-        const iconGlowMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 }); // Icône dorée luminescente
+        const crateMat = new THREE.MeshStandardMaterial({ color: 0x2e4a2b, roughness: 0.5, metalness: 0.4 });
+        const iconGlowMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
 
-        const crateLocations = [
-            [-12, 0, 6],
-            [12, 0, 6],
-            [-22, 0, -8],
-            [22, 0, -8],
-            [0, 0, 10]
-        ];
+        const crateLocations = [[-12, 0, 6], [12, 0, 6], [-22, 0, -8], [22, 0, -8], [0, 0, 10]];
 
-        const createAmmoCrate = (x, z) => {
+        crateLocations.forEach(([x, z]) => {
             const crateGroup = new THREE.Group();
             crateGroup.position.set(x, 0, z);
 
-            // Coffre principal
-            const boxGeo = new THREE.BoxGeometry(1.2, 0.7, 0.8);
-            const box = new THREE.Mesh(boxGeo, crateMat);
+            const box = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.7, 0.8), crateMat);
             box.position.y = 0.35;
             box.castShadow = true;
             box.receiveShadow = true;
             crateGroup.add(box);
 
-            // Renforts métalliques d'angles
-            const cornerGeo = new THREE.BoxGeometry(1.24, 0.12, 0.84);
-            const cornerT = new THREE.Mesh(cornerGeo, crateCornerMat);
-            cornerT.position.y = 0.65;
-            crateGroup.add(cornerT);
-
-            const cornerB = new THREE.Mesh(cornerGeo, crateCornerMat);
-            cornerB.position.y = 0.08;
-            crateGroup.add(cornerB);
-
-            // Hologramme / Symbole de munitions au-dessus de la caisse
             const iconGroup = new THREE.Group();
             iconGroup.position.y = 1.3;
-
-            // 3 balles holographiques en éventail
             for (let b = -1; b <= 1; b++) {
                 const bulletIcon = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.28, 8), iconGlowMat);
                 bulletIcon.position.x = b * 0.15;
@@ -390,22 +333,13 @@ export default function FirstPersonMap({ onExit }) {
             }
             crateGroup.add(iconGroup);
 
-            crateGroup.userData = {
-                isCrate: true,
-                available: true,
-                iconGroup,
-                respawnTimer: 0,
-                radius: 1.8
-            };
-
+            crateGroup.userData = { isCrate: true, available: true, iconGroup, respawnTimer: 0, radius: 1.8 };
             scene.add(crateGroup);
             ammoCrates.push(crateGroup);
             registerBox(box);
-        };
+        });
 
-        crateLocations.forEach(([x, z]) => createAmmoCrate(x, z));
-
-        // --- 7. ARME TACTIQUE & VISEUR ---
+        // --- 7. ARME TACTIQUE DU JOUEUR ---
         const weaponPivot = new THREE.Group();
         const weaponMeshGroup = new THREE.Group();
 
@@ -413,13 +347,10 @@ export default function FirstPersonMap({ onExit }) {
         const gunSteelMat = new THREE.MeshStandardMaterial({ color: 0x3f3f46, metalness: 0.9, roughness: 0.2 });
         const sightGlowMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
 
-        // Corps
         const body = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.14, 0.6), gunMetalMat);
         body.position.set(0.24, -0.22, -0.45);
-        body.castShadow = true;
         weaponMeshGroup.add(body);
 
-        // Canon & Frein de bouche
         const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 16), gunSteelMat);
         barrel.rotation.x = Math.PI / 2;
         barrel.position.set(0.24, -0.18, -0.8);
@@ -429,19 +360,16 @@ export default function FirstPersonMap({ onExit }) {
         muzzle.position.set(0.24, -0.18, -1.06);
         weaponMeshGroup.add(muzzle);
 
-        // Chargeur détachable
         const mag = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.24, 0.12), gunSteelMat);
         mag.position.set(0.24, -0.36, -0.42);
         mag.rotation.x = Math.PI / 12;
         weaponMeshGroup.add(mag);
 
-        // Poignée
         const grip = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.22, 0.1), gunMetalMat);
         grip.position.set(0.24, -0.34, -0.26);
         grip.rotation.x = -Math.PI / 6;
         weaponMeshGroup.add(grip);
 
-        // Viseur Holographique
         const sightBase = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.06, 0.16), gunMetalMat);
         sightBase.position.set(0.24, -0.11, -0.45);
         weaponMeshGroup.add(sightBase);
@@ -471,6 +399,7 @@ export default function FirstPersonMap({ onExit }) {
         const bulletGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.45, 8);
         bulletGeo.rotateX(Math.PI / 2);
         const bulletMat = new THREE.MeshBasicMaterial({ color: 0xfde047 });
+        const enemyBulletMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
 
         const sparks = [];
         const sparkGeo = new THREE.SphereGeometry(0.04, 6, 6);
@@ -490,23 +419,28 @@ export default function FirstPersonMap({ onExit }) {
             }
         };
 
-        const spawnBullet = () => {
-            const muzzleWorldPos = new THREE.Vector3();
-            muzzle.getWorldPosition(muzzleWorldPos);
+        const spawnBullet = (fromPlayer = true, originPos = null, dirVec = null) => {
+            const bullet = new THREE.Mesh(bulletGeo, fromPlayer ? bulletMat : enemyBulletMat);
+            let shootDir = new THREE.Vector3();
 
-            const bullet = new THREE.Mesh(bulletGeo, bulletMat);
-            bullet.position.copy(muzzleWorldPos);
-
-            const shootDir = new THREE.Vector3();
-            camera.getWorldDirection(shootDir);
-            bullet.quaternion.copy(camera.quaternion);
+            if (fromPlayer) {
+                const muzzleWorldPos = new THREE.Vector3();
+                muzzle.getWorldPosition(muzzleWorldPos);
+                bullet.position.copy(muzzleWorldPos);
+                camera.getWorldDirection(shootDir);
+                bullet.quaternion.copy(camera.quaternion);
+            } else {
+                bullet.position.copy(originPos);
+                shootDir.copy(dirVec);
+                bullet.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), shootDir);
+            }
 
             scene.add(bullet);
             bullets.push({
                 mesh: bullet,
                 dir: shootDir.clone(),
-                speed: 190.0,
-                startPos: muzzleWorldPos.clone(),
+                speed: fromPlayer ? 190.0 : 95.0,
+                fromPlayer,
                 distTravelled: 0,
                 maxDist: 200.0
             });
@@ -523,7 +457,6 @@ export default function FirstPersonMap({ onExit }) {
             setIsReloading(true);
             sound.playReload();
 
-            // Animation de rechargement (l'arme s'abaisse légèrement)
             weaponMeshGroup.position.y -= 0.15;
             weaponMeshGroup.rotation.x -= 0.2;
 
@@ -543,18 +476,16 @@ export default function FirstPersonMap({ onExit }) {
             }, 1200);
         };
 
-        // --- 10. CONTRÔLES & MOUVEMENTS ---
+        // --- 10. CONTRÔLES ---
         const controls = new PointerLockControls(camera, canvas);
 
         const onLock = () => {
             setIsLocked(true);
-            setActiveMessage('Entraînement en cours - Visez les cibles holographiques');
         };
         const onUnlock = () => {
             setIsLocked(false);
             isAimingADS = false;
             setIsAiming(false);
-            setActiveMessage('Pause - Cliquez pour reprendre le contrôle');
         };
         controls.addEventListener('lock', onLock);
         controls.addEventListener('unlock', onUnlock);
@@ -638,7 +569,6 @@ export default function FirstPersonMap({ onExit }) {
         window.addEventListener('keydown', onKeyDown);
         window.addEventListener('keyup', onKeyUp);
 
-        // Déclenchement du Tir
         const fireWeapon = () => {
             if (!controls.isLocked || reloading) return;
 
@@ -653,7 +583,7 @@ export default function FirstPersonMap({ onExit }) {
             setShotsFired((prev) => prev + 1);
 
             sound.playGunshot();
-            spawnBullet();
+            spawnBullet(true);
 
             const recoilAmount = isAimingADS ? 0.05 : 0.12;
             const recoilRot = isAimingADS ? 0.03 : 0.08;
@@ -690,7 +620,85 @@ export default function FirstPersonMap({ onExit }) {
         window.addEventListener('mouseup', onMouseUp);
         window.addEventListener('contextmenu', onContextMenu);
 
-        // --- 11. BOUCLE PRINCIPALE & PHYSIQUE ---
+        // --- 11. GESTION DES DÉGÂTS PAR ZONE & BULLSEYE ---
+        const handleFighterHit = (fighter, hitPoint) => {
+            if (!fighter.userData.isAlive) return;
+
+            sound.playHitmarker();
+            setShotsHit((prev) => prev + 1);
+
+            // Calcul de la distance par rapport au centre de la tête de cible
+            const headWorldPos = new THREE.Vector3();
+            fighter.userData.headGroup.getWorldPosition(headWorldPos);
+
+            const distToHeadCenter = hitPoint.distanceTo(headWorldPos);
+            let damage = 20; // Dégâts de base torse
+            let hitType = 'CORPS (20 DMG)';
+            let isHeadshot = false;
+
+            if (distToHeadCenter <= 0.45) {
+                isHeadshot = true;
+                if (distToHeadCenter <= 0.10) {
+                    // BULLSEYE PARFAIT AU CENTRE : 100 DÉGÂTS (ONE-SHOT KILL !)
+                    damage = 100;
+                    hitType = '🎯 BULLSEYE HEADSHOT ! (100 DMG)';
+                } else if (distToHeadCenter <= 0.24) {
+                    // ANNEAU ROUGE
+                    damage = 65;
+                    hitType = '🔴 ANNEAU ROUGE TÊTE (65 DMG)';
+                } else if (distToHeadCenter <= 0.36) {
+                    // ANNEAU BLEU
+                    damage = 40;
+                    hitType = '🔵 ANNEAU BLEU TÊTE (40 DMG)';
+                } else {
+                    // ANNEAU BLANC EXTÉRIEUR
+                    damage = 25;
+                    hitType = '⚪ BORD DE CIBLE TÊTE (25 DMG)';
+                }
+            } else if (hitPoint.y < headWorldPos.y - 0.9) {
+                damage = 15;
+                hitType = 'JAMBES / BRAS (15 DMG)';
+            }
+
+            setHitBanner({ type: hitType, isHeadshot, damage });
+            setTimeout(() => setHitBanner(null), 1800);
+
+            // Application des dégâts
+            fighter.userData.hp = Math.max(0, fighter.userData.hp - damage);
+            const hpPercent = fighter.userData.hp / fighter.userData.maxHp;
+            fighter.userData.hpBarFill.scale.x = hpPercent;
+            fighter.userData.hpBarFill.position.x = -(1 - hpPercent) * 0.48;
+
+            if (hpPercent < 0.35) {
+                fighter.userData.hpBarFill.material.color.setHex(0xef4444);
+            } else if (hpPercent < 0.65) {
+                fighter.userData.hpBarFill.material.color.setHex(0xf59e0b);
+            }
+
+            // Élimination du combattant
+            if (fighter.userData.hp <= 0) {
+                fighter.userData.isAlive = false;
+                fighter.userData.respawnTimer = 4.0;
+                fighter.visible = false;
+
+                setPlayerKills((prev) => prev + 1);
+                setScore((prev) => {
+                    const newScore = prev + (isHeadshot ? 500 : 250);
+                    SaveService.saveGameSession({
+                        score: newScore,
+                        shotsFired: 0,
+                        shotsHit: 1,
+                        targetsDestroyed: 1
+                    });
+                    return newScore;
+                });
+
+                const killMsg = `${isHeadshot ? '🎯 [BULLSEYE]' : '⚡'} Vous avez éliminé ${fighter.userData.name} (${damage} DMG)`;
+                setKillFeed((prev) => [killMsg, ...prev.slice(0, 3)]);
+            }
+        };
+
+        // --- 12. BOUCLE PRINCIPALE, IA ET PHYSIQUE ---
         let prevTime = performance.now();
         let bobTimer = 0;
         let animationFrameId;
@@ -702,14 +710,55 @@ export default function FirstPersonMap({ onExit }) {
             const delta = Math.min((time - prevTime) / 1000, 0.1);
             prevTime = time;
 
-            // Animation et oscillation des cibles
-            targetObjects.forEach((t) => {
-                if (t.userData.isDiamond) {
-                    t.userData.diamond.rotation.z = Math.PI / 4 + Math.sin(time * 0.002 + t.userData.timeOffset) * 0.2;
+            // IA des Combattants Têtes de Cibles
+            fighters.forEach((f) => {
+                if (!f.userData.isAlive) {
+                    f.userData.respawnTimer -= delta;
+                    if (f.userData.respawnTimer <= 0) {
+                        f.userData.isAlive = true;
+                        f.userData.hp = 100;
+                        f.userData.hpBarFill.scale.x = 1;
+                        f.userData.hpBarFill.position.x = 0;
+                        f.userData.hpBarFill.material.color.setHex(0x10b981);
+                        f.position.set((Math.random() - 0.5) * 40, 0, -10 - Math.random() * 20);
+                        f.visible = true;
+                    }
+                    return;
+                }
+
+                // La tête de cible et la barre de PV s'orientent vers la caméra du joueur
+                f.userData.headGroup.lookAt(camera.position.x, 1.85, camera.position.z);
+                f.userData.hpBarBg.lookAt(camera.position);
+                f.userData.hpBarFill.lookAt(camera.position);
+
+                // Déplacement IA vers sa cible aléatoire
+                const distToMove = f.position.distanceTo(f.userData.moveTarget);
+                if (distToMove < 2.0) {
+                    f.userData.moveTarget.set((Math.random() - 0.5) * 44, 0, (Math.random() - 0.5) * 44);
+                } else {
+                    const moveDir = new THREE.Vector3().subVectors(f.userData.moveTarget, f.position).normalize();
+                    f.position.addScaledVector(moveDir, delta * 3.5);
+                    f.lookAt(f.userData.moveTarget.x, f.position.y, f.userData.moveTarget.z);
+                }
+
+                // IA Tire sur le joueur si dans son champ de vision
+                f.userData.shootCooldown -= delta;
+                if (f.userData.shootCooldown <= 0) {
+                    f.userData.shootCooldown = Math.random() * 3.0 + 2.0;
+
+                    const shootOrigin = f.position.clone();
+                    shootOrigin.y = 1.2;
+
+                    const targetPlayerPos = camera.position.clone();
+                    targetPlayerPos.y -= 0.3;
+
+                    const dirToPlayer = new THREE.Vector3().subVectors(targetPlayerPos, shootOrigin).normalize();
+                    // Tir IA
+                    spawnBullet(false, shootOrigin, dirToPlayer);
                 }
             });
 
-            // Animation des caisses de munitions & ramassage
+            // Caisses de munitions
             ammoCrates.forEach((c) => {
                 if (!c.userData.available) {
                     c.userData.respawnTimer -= delta;
@@ -721,13 +770,11 @@ export default function FirstPersonMap({ onExit }) {
                     c.userData.iconGroup.rotation.y += delta * 2.0;
                     c.userData.iconGroup.position.y = 1.3 + Math.sin(time * 0.004) * 0.08;
 
-                    // Détection de proximité avec le joueur
                     const playerPos = new THREE.Vector2(camera.position.x, camera.position.z);
                     const cratePos = new THREE.Vector2(c.position.x, c.position.z);
                     if (playerPos.distanceTo(cratePos) < c.userData.radius) {
-                        // Ramassage effectué !
                         c.userData.available = false;
-                        c.userData.respawnTimer = 14.0; // Réapparition après 14s
+                        c.userData.respawnTimer = 14.0;
                         c.visible = false;
 
                         sound.playAmmoPickup();
@@ -735,12 +782,12 @@ export default function FirstPersonMap({ onExit }) {
                         setReserveAmmo(currentReserve);
 
                         setAmmoToast('+60 MUNITIONS');
-                        setTimeout(() => setAmmoToast(null), 2200);
+                        setTimeout(() => setAmmoToast(null), 2000);
                     }
                 }
             });
 
-            // Physique des balles 3D
+            // Physique des Balles 3D & Détection des impacts
             for (let i = bullets.length - 1; i >= 0; i--) {
                 const b = bullets[i];
                 const stepDist = b.speed * delta;
@@ -759,35 +806,33 @@ export default function FirstPersonMap({ onExit }) {
                         collided = true;
                         createSparks(hit.point);
 
-                        let obj = hit.object;
-                        while (obj.parent && !obj.userData?.isTarget && obj.parent !== scene) {
-                            obj = obj.parent;
-                        }
+                        if (b.fromPlayer) {
+                            // Vérifier si un combattant est touché
+                            let obj = hit.object;
+                            while (obj.parent && !obj.userData?.isFighter && obj.parent !== scene) {
+                                obj = obj.parent;
+                            }
 
-                        if (obj && obj.userData && obj.userData.isTarget) {
-                            sound.playHitmarker();
-                            setShotsHit((prev) => prev + 1);
+                            if (obj && obj.userData && obj.userData.isFighter) {
+                                handleFighterHit(obj, hit.point);
+                            }
+                        } else {
+                            // Balle ennemie touchant le joueur
+                            const distToCamera = hit.point.distanceTo(camera.position);
+                            if (distToCamera < 1.4) {
+                                setDamageFlash(true);
+                                setTimeout(() => setDamageFlash(false), 200);
 
-                            const pointsEarned = obj.userData.scoreValue || 100;
-                            setScore((prev) => {
-                                const newScore = prev + pointsEarned;
-                                const updated = SaveService.saveGameSession({
-                                    score: newScore,
-                                    shotsFired: 0,
-                                    shotsHit: 1,
-                                    targetsDestroyed: 1
+                                setPlayerHp((prev) => {
+                                    const nextHp = Math.max(0, prev - 20);
+                                    if (nextHp <= 0) {
+                                        setPlayerDeaths((d) => d + 1);
+                                        camera.position.set((Math.random() - 0.5) * 30, 1.7, 20);
+                                        return 100;
+                                    }
+                                    return nextHp;
                                 });
-                                if (updated) {
-                                    setSavedStats(updated);
-                                    setSaveToast(true);
-                                    setTimeout(() => setSaveToast(false), 2000);
-                                }
-                                return newScore;
-                            });
-
-                            // Effet de choc / tremblement sur la cible
-                            obj.position.y -= 0.1;
-                            setTimeout(() => { obj.position.y += 0.1; }, 150);
+                            }
                         }
                         break;
                     }
@@ -829,7 +874,6 @@ export default function FirstPersonMap({ onExit }) {
                 if (moveState.forward || moveState.backward) velocity.z += dir.z * speed * 10.0 * delta;
                 if (moveState.left || moveState.right) velocity.x += dir.x * speed * 10.0 * delta;
 
-                // Collisions X
                 const oldX = camera.position.x;
                 controls.moveRight(velocity.x * delta);
                 const playerBoxX = new THREE.Box3(
@@ -844,7 +888,6 @@ export default function FirstPersonMap({ onExit }) {
                     }
                 }
 
-                // Collisions Z
                 const oldZ = camera.position.z;
                 controls.moveForward(velocity.z * delta);
                 const playerBoxZ = new THREE.Box3(
@@ -859,7 +902,6 @@ export default function FirstPersonMap({ onExit }) {
                     }
                 }
 
-                // Gravité et plateformes
                 camera.position.y += velocity.y * delta;
                 let groundY = 1.7;
                 for (const col of colliders) {
@@ -882,7 +924,6 @@ export default function FirstPersonMap({ onExit }) {
                     canJump = true;
                 }
 
-                // Transition FOV et centrage ADS
                 const targetFov = isAimingADS ? 44 : 75;
                 camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, delta * 14);
                 camera.updateProjectionMatrix();
@@ -890,7 +931,6 @@ export default function FirstPersonMap({ onExit }) {
                 const targetPivotPos = isAimingADS ? adsPosition : hipPosition;
                 weaponPivot.position.lerp(targetPivotPos, delta * 16);
 
-                // Sway / Bobbing
                 const isMoving = moveState.forward || moveState.backward || moveState.left || moveState.right;
                 if (isMoving && canJump && !isAimingADS && !reloading) {
                     bobTimer += delta * (moveState.sprint ? 14 : 9);
@@ -911,7 +951,6 @@ export default function FirstPersonMap({ onExit }) {
 
         animate();
 
-        // --- 12. CLEANUP ---
         const handleResize = () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
@@ -939,6 +978,11 @@ export default function FirstPersonMap({ onExit }) {
 
     return (
         <div className="relative w-screen h-screen overflow-hidden bg-slate-900 select-none font-sans">
+            {/* Flash rouge lors d'un dégât reçu */}
+            {damageFlash && (
+                <div className="pointer-events-none absolute inset-0 bg-red-600/35 z-40 animate-pulse"></div>
+            )}
+
             {/* Canvas 3D */}
             <canvas
                 ref={canvasRef}
@@ -949,7 +993,7 @@ export default function FirstPersonMap({ onExit }) {
                 }}
             />
 
-            {/* Réticule de visée tactique */}
+            {/* Réticule de visée */}
             {isLocked && (
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                     <div className="relative flex items-center justify-center">
@@ -967,7 +1011,29 @@ export default function FirstPersonMap({ onExit }) {
                 </div>
             )}
 
-            {/* HUD Supérieur : Score, Précision & Record */}
+            {/* Bannière de Touche / Bullseye */}
+            {hitBanner && (
+                <div className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 animate-bounce">
+                    <div className={`px-6 py-2.5 rounded-xl font-black text-sm uppercase tracking-widest shadow-2xl backdrop-blur border ${
+                        hitBanner.isHeadshot
+                            ? 'bg-amber-500/90 text-zinc-950 border-amber-300 shadow-[0_0_20px_rgba(245,158,11,0.8)] scale-110'
+                            : 'bg-slate-900/90 text-cyan-300 border-cyan-500/50'
+                    }`}>
+                        {hitBanner.type}
+                    </div>
+                </div>
+            )}
+
+            {/* KillFeed en haut à droite */}
+            <div className="pointer-events-none absolute top-20 right-8 flex flex-col space-y-2 z-30">
+                {killFeed.map((kf, i) => (
+                    <div key={i} className="bg-slate-900/90 border border-slate-700/80 text-xs px-3.5 py-1.5 rounded-lg text-slate-200 shadow-lg animate-fadeIn">
+                        {kf}
+                    </div>
+                ))}
+            </div>
+
+            {/* HUD Supérieur */}
             <div className="pointer-events-none absolute top-6 left-8 right-8 flex items-center justify-between text-white">
                 <div className="flex items-center space-x-6 bg-slate-900/85 backdrop-blur border border-slate-700/70 px-5 py-3 rounded-lg shadow-xl">
                     <div>
@@ -976,29 +1042,17 @@ export default function FirstPersonMap({ onExit }) {
                     </div>
                     <div className="w-px h-8 bg-slate-700"></div>
                     <div>
+                        <div className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">Kills / Morts</div>
+                        <div className="text-xl font-bold text-emerald-400">{playerKills} <span className="text-slate-500">/</span> {playerDeaths}</div>
+                    </div>
+                    <div className="w-px h-8 bg-slate-700"></div>
+                    <div>
                         <div className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">Précision</div>
                         <div className="text-xl font-bold text-slate-200">{accuracy}%</div>
-                    </div>
-                    <div className="w-px h-8 bg-slate-700"></div>
-                    <div>
-                        <div className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">Touches</div>
-                        <div className="text-xl font-bold text-emerald-400">{shotsHit} / {shotsFired}</div>
-                    </div>
-                    <div className="w-px h-8 bg-slate-700"></div>
-                    <div>
-                        <div className="text-[10px] text-amber-400 uppercase tracking-widest font-semibold">Record</div>
-                        <div className="text-xl font-bold text-amber-300">{savedStats?.highScore || 0} pts</div>
                     </div>
                 </div>
 
                 <div className="flex items-center space-x-3">
-                    {saveToast && (
-                        <div className="bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 px-3.5 py-1.5 rounded-lg text-xs font-semibold tracking-wide flex items-center space-x-1.5 animate-bounce shadow-lg">
-                            <span>💾</span>
-                            <span>Progression Sauvegardée</span>
-                        </div>
-                    )}
-
                     {ammoToast && (
                         <div className="bg-amber-500/20 border border-amber-500/50 text-amber-300 px-3.5 py-1.5 rounded-lg text-xs font-bold tracking-wider flex items-center space-x-1.5 animate-pulse shadow-lg">
                             <span>📦</span>
@@ -1013,13 +1067,29 @@ export default function FirstPersonMap({ onExit }) {
                     )}
 
                     <div className="bg-slate-900/85 backdrop-blur border border-slate-700/70 px-4 py-2.5 rounded-lg text-xs tracking-wider text-slate-300">
-                        STAND DE TIR • <span className="text-cyan-400 font-medium">GASHOOTER</span>
+                        ARÈNE 4 JOUEURS • <span className="text-cyan-400 font-medium">GASHOOTER</span>
                     </div>
                 </div>
             </div>
 
-            {/* HUD Munitions (Chargeur + Réserve + Rechargement) */}
-            <div className="pointer-events-none absolute bottom-24 right-8 flex flex-col items-end">
+            {/* Barre de Vie (HP) du Joueur en bas à gauche */}
+            <div className="pointer-events-none absolute bottom-6 left-8 z-30">
+                <div className="bg-slate-900/90 backdrop-blur border border-slate-700/80 p-4 rounded-xl shadow-2xl w-64 space-y-1.5">
+                    <div className="flex justify-between items-center text-xs">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Santé du Joueur</span>
+                        <span className={`font-black ${playerHp > 40 ? 'text-emerald-400' : 'text-red-400 animate-pulse'}`}>{playerHp} / 100 HP</span>
+                    </div>
+                    <div className="w-full h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-700/60">
+                        <div
+                            className={`h-full transition-all duration-200 ${playerHp > 50 ? 'bg-emerald-500' : playerHp > 25 ? 'bg-amber-500' : 'bg-red-500'}`}
+                            style={{ width: `${playerHp}%` }}
+                        ></div>
+                    </div>
+                </div>
+            </div>
+
+            {/* HUD Munitions */}
+            <div className="pointer-events-none absolute bottom-6 right-8 flex flex-col items-end z-30">
                 <div className="bg-slate-900/90 backdrop-blur border border-slate-700/80 px-6 py-4 rounded-xl shadow-2xl flex items-baseline space-x-3 text-white">
                     <div className={`text-4xl font-black tracking-tight ${magAmmo <= 5 ? 'text-red-500 animate-pulse' : 'text-cyan-400'}`}>
                         {magAmmo}
@@ -1035,81 +1105,51 @@ export default function FirstPersonMap({ onExit }) {
 
                 {isReloading && (
                     <div className="mt-2 bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-widest animate-pulse">
-                        🔄 Rechargement en cours...
+                        🔄 Rechargement...
                     </div>
                 )}
 
                 {magAmmo === 0 && !isReloading && (
                     <div className="mt-2 bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-widest animate-bounce">
-                        ⚠️ APPUYEZ SUR [R] POUR RECHARGER
+                        ⚠️ [R] POUR RECHARGER
                     </div>
                 )}
-            </div>
-
-            {/* HUD Inférieur : Commandes & Aide */}
-            <div className="pointer-events-none absolute bottom-6 left-8 right-8 flex items-end justify-between">
-                <div className="bg-slate-900/85 backdrop-blur border border-slate-700/70 px-4 py-3 rounded-lg text-xs text-slate-300 space-y-1 shadow-xl">
-                    <div className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-1">Commandes</div>
-                    <div><span className="text-cyan-400 font-semibold">[Z / Q / S / D]</span> : Se déplacer • <span className="text-cyan-400 font-semibold">[ESPACE]</span> : Sauter</div>
-                    <div><span className="text-cyan-400 font-semibold">[CLIC GAUCHE]</span> : Tirer • <span className="text-cyan-400 font-semibold">[R]</span> : 🔄 Recharger • <span className="text-cyan-400 font-semibold">[CLIC DROIT]</span> : 🎯 Viser</div>
-                    <div><span className="text-amber-400 font-semibold">[📦 CAISSES AU SOL]</span> : Marchez dessus pour ramasser +60 munitions</div>
-                </div>
-
-                <button
-                    onClick={() => {
-                        SaveService.saveGameSession({
-                            score,
-                            shotsFired,
-                            shotsHit,
-                            targetsDestroyed: shotsHit
-                        });
-                        onExitRef.current();
-                    }}
-                    className="pointer-events-auto px-5 py-2.5 bg-slate-800/90 hover:bg-red-950/80 text-slate-300 hover:text-red-300 border border-slate-700 hover:border-red-700/50 rounded-lg text-xs font-semibold tracking-wider uppercase transition-all shadow-md cursor-pointer"
-                >
-                    Quitter l'entraînement
-                </button>
             </div>
 
             {/* Overlay d'accueil / pause */}
             {!isLocked && (
                 <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center z-50">
-                    <div className="bg-slate-900/95 border border-slate-700 p-8 rounded-xl max-w-md w-full text-center shadow-2xl space-y-6">
+                    <div className="bg-slate-900/95 border border-slate-700 p-8 rounded-xl max-w-lg w-full text-center shadow-2xl space-y-6">
                         <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-2xl font-bold">
-                            🎯
+                            ⚔️
                         </div>
                         <div>
                             <h2 className="text-2xl font-extrabold text-white tracking-wide uppercase">
-                                Stand de Tir & Cibles
+                                Arène 4 Joueurs • Têtes de Cibles
                             </h2>
                             <p className="text-xs text-slate-400 mt-2">
-                                {activeMessage}
+                                4 Combattants dans l'arène. Visez le centre de la cible pour infliger le maximum de dégâts !
                             </p>
                         </div>
 
-                        {/* Guide des Cibles */}
-                        <div className="bg-slate-800/80 border border-slate-700/80 rounded-lg p-3 text-left text-xs space-y-2 text-slate-300">
-                            <div className="text-[10px] uppercase font-bold text-cyan-400 tracking-wider">Guide des Cibles & Points</div>
-                            <div className="flex items-center justify-between">
-                                <span className="flex items-center space-x-2">
-                                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span>
-                                    <span>Cible Tir à l'arc (Classique)</span>
-                                </span>
-                                <span className="font-bold text-cyan-400">100 - 300 pts</span>
+                        {/* Barème de Dégâts par Zone */}
+                        <div className="bg-slate-800/80 border border-slate-700/80 rounded-lg p-3.5 text-left text-xs space-y-2 text-slate-300">
+                            <div className="text-[10px] uppercase font-bold text-cyan-400 tracking-wider">Barème des Dégâts par Zone</div>
+                            <div className="flex items-center justify-between text-amber-300 font-bold">
+                                <span>🎯 Bullseye Centre (Tête) :</span>
+                                <span className="bg-amber-400/20 px-2 py-0.5 rounded border border-amber-400/40">100 DMG (One-Shot)</span>
                             </div>
-                            <div className="flex items-center justify-between">
-                                <span className="flex items-center space-x-2">
-                                    <span className="w-2.5 h-2.5 rotate-45 bg-orange-500 inline-block"></span>
-                                    <span>Cible Diamant (Moyenne Portée)</span>
-                                </span>
-                                <span className="font-bold text-orange-400">150 - 200 pts</span>
+                            <div className="flex items-center justify-between text-red-400 font-semibold">
+                                <span>🔴 Anneau Rouge (Tête) :</span>
+                                <span>65 DMG</span>
                             </div>
-                            <div className="flex items-center justify-between">
-                                <span className="flex items-center space-x-2">
-                                    <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block"></span>
-                                    <span>Cible Élite (Longue Portée)</span>
-                                </span>
-                                <span className="font-bold text-purple-400">500 pts</span>
+                            <div className="flex items-center justify-between text-sky-400 font-medium">
+                                <span>🔵 Anneau Bleu (Tête) :</span>
+                                <span>40 DMG</span>
+                            </div>
+                            <div className="flex items-center justify-between text-slate-400">
+                                <span>🛡️ Torse / Membres :</span>
+                                <span>15 - 20 DMG</span>
                             </div>
                         </div>
 
@@ -1121,7 +1161,7 @@ export default function FirstPersonMap({ onExit }) {
                                 }}
                                 className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-lg text-sm uppercase tracking-wider transition-colors shadow-lg cursor-pointer"
                             >
-                                Commencer à Tirer
+                                Entrer dans l'Arène
                             </button>
                             <button
                                 onClick={() => onExitRef.current()}
