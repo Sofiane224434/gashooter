@@ -5,6 +5,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { sound } from '../../services/sound.js';
 import { SaveService } from '../../services/saveService.js';
 import { MultiplayerClient } from '../../services/multiplayerClient.js';
@@ -137,36 +138,201 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
         const ZONE_B_Z_MIN = -30, ZONE_B_Z_MAX = 30; // Tunnel métro : z = -30..30
         const ZONE_C_Z_MIN = -100;  // Rue urbaine : z = -100..-30
 
-        // Matériaux réalistes
-        const grassMat = new THREE.MeshStandardMaterial({ color: 0x2d5016, roughness: 0.85, metalness: 0.05 });
-        const dirtPathMat = new THREE.MeshStandardMaterial({ color: 0x5c4a32, roughness: 0.9, metalness: 0.05 });
-        const asphaltMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7, metalness: 0.2 });
-        const concreteMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.6, metalness: 0.25 });
-        const concreteDarkMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.65, metalness: 0.3 });
-        const metalPlateMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.35, metalness: 0.8 });
-        const metalRustMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.7, metalness: 0.5 });
-        const militaryOliveMat = new THREE.MeshStandardMaterial({ color: 0x1e3a1e, roughness: 0.5, metalness: 0.4 });
-        const rustContainerMat = new THREE.MeshStandardMaterial({ color: 0x9a3412, roughness: 0.6, metalness: 0.4 });
-        const blueContainerMat = new THREE.MeshStandardMaterial({ color: 0x0369a1, roughness: 0.5, metalness: 0.5 });
-        const greenContainerMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.55, metalness: 0.45 });
-        const metroTrainMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4, metalness: 0.7 });
-        const metroTrainAccentMat = new THREE.MeshStandardMaterial({ color: 0x0ea5e9, roughness: 0.3, metalness: 0.6 });
+        // =========================================================================
+        // GÉNÉRATEUR DE TEXTURES PBR RÉALISTES (CANVAS PROCEDURAL TEXTURES)
+        // Diffuse, Normal/Bump, et Roughness maps haute fidélité Battlefield
+        // =========================================================================
+        const createPBRTexture = (width, height, drawFn) => {
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            drawFn(ctx, width, height);
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            return tex;
+        };
+
+        // 1. Asphalte de voirie (grain d'agrégat, usure, micro-fissures)
+        const asphaltDiffTex = createPBRTexture(512, 512, (ctx, w, h) => {
+            ctx.fillStyle = '#1e2530';
+            ctx.fillRect(0, 0, w, h);
+            for (let i = 0; i < 25000; i++) {
+                const x = Math.random() * w, y = Math.random() * h;
+                const c = Math.floor(25 + Math.random() * 35);
+                ctx.fillStyle = `rgb(${c},${c + 2},${c + 6})`;
+                ctx.fillRect(x, y, 1.5, 1.5);
+            }
+            // Fissures sombres d'usure
+            ctx.strokeStyle = '#0f141c';
+            ctx.lineWidth = 1.2;
+            for (let j = 0; j < 5; j++) {
+                ctx.beginPath();
+                let cx = Math.random() * w, cy = Math.random() * h;
+                ctx.moveTo(cx, cy);
+                for (let k = 0; k < 6; k++) {
+                    cx += (Math.random() - 0.5) * 50;
+                    cy += (Math.random() - 0.5) * 50;
+                    ctx.lineTo(cx, cy);
+                }
+                ctx.stroke();
+            }
+        });
+        asphaltDiffTex.repeat.set(12, 12);
+
+        const asphaltBumpTex = createPBRTexture(256, 256, (ctx, w, h) => {
+            ctx.fillStyle = '#808080';
+            ctx.fillRect(0, 0, w, h);
+            for (let i = 0; i < 15000; i++) {
+                const x = Math.random() * w, y = Math.random() * h;
+                const v = Math.floor(Math.random() * 255);
+                ctx.fillStyle = `rgb(${v},${v},${v})`;
+                ctx.fillRect(x, y, 1.5, 1.5);
+            }
+        });
+        asphaltBumpTex.repeat.set(12, 12);
+
+        // 2. Béton armé vieilli & fissuré (plaques de coffrage, salissures)
+        const concreteDiffTex = createPBRTexture(512, 512, (ctx, w, h) => {
+            ctx.fillStyle = '#64748b';
+            ctx.fillRect(0, 0, w, h);
+            for (let i = 0; i < 18000; i++) {
+                const x = Math.random() * w, y = Math.random() * h;
+                const c = Math.floor(80 + Math.random() * 50);
+                ctx.fillStyle = `rgba(${c},${c},${c},0.3)`;
+                ctx.fillRect(x, y, 2, 2);
+            }
+            // Joints de dilatation
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 2.5;
+            ctx.strokeRect(4, 4, w - 8, h - 8);
+        });
+        concreteDiffTex.repeat.set(6, 6);
+
+        // 3. Tôle de conteneur ondulée et rouillée (Corten steel)
+        const cortenDiffTex = createPBRTexture(512, 512, (ctx, w, h) => {
+            ctx.fillStyle = '#854d0e';
+            ctx.fillRect(0, 0, w, h);
+            // Bandes d'ondulation
+            for (let x = 0; x < w; x += 32) {
+                const grad = ctx.createLinearGradient(x, 0, x + 32, 0);
+                grad.addColorStop(0, '#9a3412');
+                grad.addColorStop(0.5, '#7c2d12');
+                grad.addColorStop(1, '#451a03');
+                ctx.fillStyle = grad;
+                ctx.fillRect(x, 0, 32, h);
+            }
+            // Taches d'oxydation et de rouille
+            for (let r = 0; r < 25; r++) {
+                const rx = Math.random() * w, ry = Math.random() * h, rad = 10 + Math.random() * 30;
+                const rustGrad = ctx.createRadialGradient(rx, ry, 2, rx, ry, rad);
+                rustGrad.addColorStop(0, 'rgba(69, 26, 3, 0.8)');
+                rustGrad.addColorStop(1, 'rgba(154, 52, 18, 0)');
+                ctx.fillStyle = rustGrad;
+                ctx.fillRect(rx - rad, ry - rad, rad * 2, rad * 2);
+            }
+        });
+        cortenDiffTex.repeat.set(3, 2);
+
+        // 4. Brique haussmannienne avec mortier
+        const brickDiffTex = createPBRTexture(512, 512, (ctx, w, h) => {
+            ctx.fillStyle = '#94a3b8'; // mortier
+            ctx.fillRect(0, 0, w, h);
+            const rows = 16, cols = 8;
+            const rh = h / rows, cw = w / cols;
+            for (let r = 0; r < rows; r++) {
+                const offset = (r % 2) * (cw / 2);
+                for (let c = -1; c <= cols; c++) {
+                    const bx = c * cw + offset + 2;
+                    const by = r * rh + 2;
+                    const shade = Math.floor(100 + Math.random() * 40);
+                    ctx.fillStyle = `rgb(${shade + 25},${shade - 30},${shade - 40})`;
+                    ctx.fillRect(bx, by, cw - 4, rh - 4);
+                }
+            }
+        });
+        brickDiffTex.repeat.set(4, 4);
+
+        // 5. Carrelage parisien de métro (brillant avec joints)
+        const tileDiffTex = createPBRTexture(512, 512, (ctx, w, h) => {
+            ctx.fillStyle = '#475569'; // joints
+            ctx.fillRect(0, 0, w, h);
+            const ts = 32;
+            for (let tx = 0; tx < w; tx += ts) {
+                for (let ty = 0; ty < h; ty += ts) {
+                    const lum = Math.floor(180 + Math.random() * 40);
+                    ctx.fillStyle = `rgb(${lum},${lum + 5},${lum + 10})`;
+                    ctx.fillRect(tx + 1.5, ty + 1.5, ts - 3, ts - 3);
+                }
+            }
+        });
+        tileDiffTex.repeat.set(8, 8);
+
+        // 6. Toile de jute militaire (sacs de sable)
+        const sandbagDiffTex = createPBRTexture(256, 256, (ctx, w, h) => {
+            ctx.fillStyle = '#4d5b38';
+            ctx.fillRect(0, 0, w, h);
+            ctx.strokeStyle = '#384328';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < w; i += 6) {
+                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, h); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(w, i); ctx.stroke();
+            }
+        });
+        sandbagDiffTex.repeat.set(4, 4);
+
+        // Matériaux PBR réalistes avec Textures & Bump
+        const grassMat = new THREE.MeshStandardMaterial({ color: 0x2d5016, roughness: 0.9, metalness: 0.05 });
+        const dirtPathMat = new THREE.MeshStandardMaterial({ color: 0x5c4a32, roughness: 0.95, metalness: 0.05 });
+        const asphaltMat = new THREE.MeshStandardMaterial({
+            map: asphaltDiffTex,
+            bumpMap: asphaltBumpTex,
+            bumpScale: 0.04,
+            roughness: 0.75,
+            metalness: 0.15
+        });
+        const concreteMat = new THREE.MeshStandardMaterial({
+            map: concreteDiffTex,
+            bumpMap: asphaltBumpTex,
+            bumpScale: 0.03,
+            roughness: 0.65,
+            metalness: 0.2
+        });
+        const concreteDarkMat = new THREE.MeshStandardMaterial({
+            map: concreteDiffTex,
+            color: 0x334155,
+            roughness: 0.7,
+            metalness: 0.25
+        });
+        const metalPlateMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.35, metalness: 0.85 });
+        const metalRustMat = new THREE.MeshStandardMaterial({ map: cortenDiffTex, roughness: 0.7, metalness: 0.5 });
+        const militaryOliveMat = new THREE.MeshStandardMaterial({ map: sandbagDiffTex, roughness: 0.85, metalness: 0.2 });
+        const rustContainerMat = new THREE.MeshStandardMaterial({ map: cortenDiffTex, roughness: 0.65, metalness: 0.45 });
+        const blueContainerMat = new THREE.MeshStandardMaterial({ map: cortenDiffTex, color: 0x0284c7, roughness: 0.55, metalness: 0.5 });
+        const greenContainerMat = new THREE.MeshStandardMaterial({ map: cortenDiffTex, color: 0x16a34a, roughness: 0.55, metalness: 0.5 });
+        const metroTrainMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.35, metalness: 0.75 });
+        const metroTrainAccentMat = new THREE.MeshStandardMaterial({ color: 0x0ea5e9, roughness: 0.25, metalness: 0.6 });
         const yellowHazardMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
         const neonCyanMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
         const neonOrangeMat = new THREE.MeshBasicMaterial({ color: 0xf97316 });
         const neonRedMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
-        const brickMat = new THREE.MeshStandardMaterial({ color: 0x7c2d12, roughness: 0.75, metalness: 0.15 });
-        const brickLightMat = new THREE.MeshStandardMaterial({ color: 0xa3623a, roughness: 0.8, metalness: 0.1 });
-        const windowMat = new THREE.MeshStandardMaterial({ color: 0x172554, roughness: 0.1, metalness: 0.9 });
-        const tileFloorMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.5, metalness: 0.3 });
-        const railMat = new THREE.MeshStandardMaterial({ color: 0x52525b, roughness: 0.3, metalness: 0.9 });
-        const treeTrunkMat = new THREE.MeshStandardMaterial({ color: 0x3e2723, roughness: 0.9, metalness: 0.05 });
+        const brickMat = new THREE.MeshStandardMaterial({ map: brickDiffTex, roughness: 0.8, metalness: 0.1 });
+        const brickLightMat = new THREE.MeshStandardMaterial({ map: brickDiffTex, color: 0xd97706, roughness: 0.8, metalness: 0.1 });
+        const windowMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.1, metalness: 0.95 });
+        const tileFloorMat = new THREE.MeshStandardMaterial({
+            map: tileDiffTex,
+            roughness: 0.4,
+            metalness: 0.3
+        });
+        const railMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.3, metalness: 0.9 });
+        const treeTrunkMat = new THREE.MeshStandardMaterial({ color: 0x271c19, roughness: 0.9, metalness: 0.05 });
         const treeLeafMat = new THREE.MeshStandardMaterial({ color: 0x1b5e20, roughness: 0.8, metalness: 0.05 });
         const treeLeafDarkMat = new THREE.MeshStandardMaterial({ color: 0x0d3f14, roughness: 0.85, metalness: 0.05 });
-        const stoneMat = new THREE.MeshStandardMaterial({ color: 0x78716c, roughness: 0.7, metalness: 0.2 });
-        const lampMat = new THREE.MeshStandardMaterial({ color: 0x27272a, roughness: 0.3, metalness: 0.8 });
-        const carBodyMat = new THREE.MeshStandardMaterial({ color: 0x1c1917, roughness: 0.5, metalness: 0.6 });
-        const carBurntMat = new THREE.MeshStandardMaterial({ color: 0x292524, roughness: 0.8, metalness: 0.3 });
+        const stoneMat = new THREE.MeshStandardMaterial({ map: concreteDiffTex, roughness: 0.75, metalness: 0.15 });
+        const lampMat = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.3, metalness: 0.85 });
+        const carBodyMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4, metalness: 0.7 });
+        const carBurntMat = new THREE.MeshStandardMaterial({ color: 0x1c1917, roughness: 0.85, metalness: 0.25 });
 
         const colliders = [];      // Box3 array pour collision horizontale (murs) 
         const colliderMeshes = [];  // meshes pour raycasting balles
@@ -610,6 +776,135 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
         addSolidPlatform(60, 0, -85, 6.0, 4.5, 6.0, concreteDarkMat);
         addTacticalStairs(60, 0, -78, 2.0, 4.5, 6.5, 12, -1);
         addJerseyBarrier(60, -87.5, 0);
+
+        // =========================================================================
+        // CHARGEMENT DE VRAIS ASSETS 3D GLTF/GLB (POLYGONAL MIND & THREE.JS REAL ASSETS)
+        // Rames de métro 3D, Rails, Véhicules, Clôtures, Végétation et Mobilier urbain
+        // =========================================================================
+        const gltfLoader = new GLTFLoader();
+
+        // 1. Vraies Rames de Métro 3D
+        gltfLoader.load('/assets/models/Train_01_Art.glb', (gltf) => {
+            const train1 = gltf.scene.clone();
+            train1.scale.set(0.014, 0.014, 0.014);
+            train1.position.set(-12, 0.1, 0);
+            train1.rotation.y = Math.PI / 2;
+            train1.traverse((c) => {
+                if (c.isMesh) {
+                    c.castShadow = true;
+                    c.receiveShadow = true;
+                    colliderMeshes.push(c);
+                }
+            });
+            scene.add(train1);
+
+            const train2 = gltf.scene.clone();
+            train2.scale.set(0.014, 0.014, 0.014);
+            train2.position.set(12, 0.1, 0);
+            train2.rotation.y = -Math.PI / 2;
+            train2.traverse((c) => {
+                if (c.isMesh) {
+                    c.castShadow = true;
+                    c.receiveShadow = true;
+                    colliderMeshes.push(c);
+                }
+            });
+            scene.add(train2);
+        }, undefined, (e) => console.log('Train GLB load:', e?.message || e));
+
+        // 2. Vrais Rails 3D
+        gltfLoader.load('/assets/models/Train_Track_01.glb', (gltf) => {
+            for (let trackX of [-12, 12]) {
+                for (let tz = -24; tz <= 24; tz += 12) {
+                    const track = gltf.scene.clone();
+                    track.scale.set(0.018, 0.018, 0.018);
+                    track.position.set(trackX, 0.06, tz);
+                    scene.add(track);
+                }
+            }
+        }, undefined, () => {});
+
+        // 3. Vrais Véhicules 3D
+        gltfLoader.load('/assets/models/ferrari.glb', (gltf) => {
+            const car1 = gltf.scene.clone();
+            car1.scale.set(1.15, 1.15, 1.15);
+            car1.position.set(-1.8, 0.02, -45);
+            car1.rotation.y = 0.25;
+            car1.traverse((c) => {
+                if (c.isMesh) {
+                    c.castShadow = true;
+                    c.receiveShadow = true;
+                    colliderMeshes.push(c);
+                }
+            });
+            scene.add(car1);
+
+            const car2 = gltf.scene.clone();
+            car2.scale.set(1.15, 1.15, 1.15);
+            car2.position.set(2.0, 0.02, -75);
+            car2.rotation.y = -0.3;
+            car2.traverse((c) => {
+                if (c.isMesh) {
+                    c.castShadow = true;
+                    c.receiveShadow = true;
+                    colliderMeshes.push(c);
+                }
+            });
+            scene.add(car2);
+        }, undefined, () => {});
+
+        // 4. Vrais Bancs de Parc 3D
+        gltfLoader.load('/assets/models/Bench_01_Art.glb', (gltf) => {
+            const benchPositions = [
+                [-4.5, 65, Math.PI / 2],
+                [4.5, 65, -Math.PI / 2],
+                [-4.5, 75, Math.PI / 2],
+                [4.5, 75, -Math.PI / 2]
+            ];
+            benchPositions.forEach(([bx, bz, brot]) => {
+                const bench = gltf.scene.clone();
+                bench.scale.set(0.015, 0.015, 0.015);
+                bench.position.set(bx, 0, bz);
+                bench.rotation.y = brot;
+                bench.traverse((c) => {
+                    if (c.isMesh) {
+                        c.castShadow = true;
+                        colliderMeshes.push(c);
+                    }
+                });
+                scene.add(bench);
+            });
+        }, undefined, () => {});
+
+        // 5. Vraie Végétation & Buissons 3D
+        gltfLoader.load('/assets/models/Bush_01_Art.glb', (gltf) => {
+            for (let i = 0; i < 14; i++) {
+                const bush = gltf.scene.clone();
+                const bx = (i % 2 === 0 ? -1 : 1) * (10 + (i * 7) % 30);
+                const bz = 40 + (i * 8) % 55;
+                bush.scale.set(0.016, 0.016, 0.016);
+                bush.position.set(bx, 0, bz);
+                bush.rotation.y = Math.random() * Math.PI * 2;
+                bush.traverse((c) => { if (c.isMesh) c.castShadow = true; });
+                scene.add(bush);
+            }
+        }, undefined, () => {});
+
+        // 6. Vraies Clôtures de Gare 3D
+        gltfLoader.load('/assets/models/Tower_Station_Fence_Art.glb', (gltf) => {
+            for (let fz = -20; fz <= 20; fz += 10) {
+                const fenceL = gltf.scene.clone();
+                fenceL.scale.set(0.015, 0.015, 0.015);
+                fenceL.position.set(-6, 0.85, fz);
+                scene.add(fenceL);
+
+                const fenceR = gltf.scene.clone();
+                fenceR.scale.set(0.015, 0.015, 0.015);
+                fenceR.position.set(6, 0.85, fz);
+                fenceR.rotation.y = Math.PI;
+                scene.add(fenceR);
+            }
+        }, undefined, () => {});
 
         // --- 5. MODÈLE DE JOUEUR ADVERSE ---
         const remotePlayersMap = new Map();
