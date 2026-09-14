@@ -397,6 +397,135 @@ class SoundEngine {
             osc2.stop(now + 0.35);
         } catch (e) {}
     }
+
+    // BRUITS DE PAS DYNAMIQUES (BOTTES DE COMBAT)
+    playFootstep(isSprinting = false) {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+            const now = this.ctx.currentTime;
+            // 1. Impact de botte au sol
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            const baseFreq = isSprinting ? 110 : 85;
+            osc.frequency.setValueAtTime(baseFreq + Math.random() * 20, now);
+            osc.frequency.exponentialRampToValueAtTime(30, now + 0.06);
+
+            gain.gain.setValueAtTime(this.volume * (isSprinting ? 0.35 : 0.22), now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.07);
+
+            // 2. Bruissement de gravier / semelle
+            if (this.noiseBuffer) {
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = this.noiseBuffer;
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.setValueAtTime(1400 + Math.random() * 400, now);
+                filter.Q.value = 3;
+                const nGain = this.ctx.createGain();
+                nGain.gain.setValueAtTime(this.volume * (isSprinting ? 0.2 : 0.12), now);
+                nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                noise.connect(filter);
+                filter.connect(nGain);
+                nGain.connect(this.ctx.destination);
+                noise.start(now);
+                noise.stop(now + 0.05);
+            }
+        } catch (e) {}
+    }
+
+    // SAUT (IMPULSION ÉQUIPEMENT)
+    playJump() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(120, now);
+            osc.frequency.exponentialRampToValueAtTime(320, now + 0.1);
+            gain.gain.setValueAtTime(this.volume * 0.3, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.12);
+        } catch (e) {}
+    }
+
+    // ATTERRISSAGE LOURD (BOTTES + GILET TACTIQUE)
+    playLand() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+            const now = this.ctx.currentTime;
+            // Impact lourd
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(130, now);
+            osc.frequency.exponentialRampToValueAtTime(30, now + 0.12);
+            gain.gain.setValueAtTime(this.volume * 0.5, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.14);
+
+            // Bruit d'équipement
+            if (this.noiseBuffer) {
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = this.noiseBuffer;
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(1200, now);
+                const nGain = this.ctx.createGain();
+                nGain.gain.setValueAtTime(this.volume * 0.3, now);
+                nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+                noise.connect(filter);
+                filter.connect(nGain);
+                nGain.connect(this.ctx.destination);
+                noise.start(now);
+                noise.stop(now + 0.1);
+            }
+        } catch (e) {}
+    }
+
+    // ACCROUPISSEMENT / BRUISSEMENT DE TREILLIS
+    playCrouch() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+            const now = this.ctx.currentTime;
+            if (this.noiseBuffer) {
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = this.noiseBuffer;
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.setValueAtTime(900, now);
+                filter.frequency.exponentialRampToValueAtTime(400, now + 0.12);
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(this.volume * 0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+                noise.start(now);
+                noise.stop(now + 0.14);
+            }
+        } catch (e) {}
+    }
 }
 
 export const sound = new SoundEngine();

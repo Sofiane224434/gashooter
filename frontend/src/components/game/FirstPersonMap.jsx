@@ -16,8 +16,6 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
 
     const [isLocked, setIsLocked] = useState(false);
     const [isAiming, setIsAiming] = useState(false);
-    const [isCrouching, setIsCrouching] = useState(false);
-    const [isSliding, setIsSliding] = useState(false);
     const [activeWeaponSlot, setActiveWeaponSlot] = useState(1); // 1 = AR-47, 2 = AWP-50 Sniper
     const [autoSprint, setAutoSprint] = useState(() => {
         const saved = localStorage.getItem('gashooter_autosprint');
@@ -32,7 +30,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
     const [shotsHit, setShotsHit] = useState(0);
 
     const [weaponsAmmo, setWeaponsAmmo] = useState({
-        1: { mag: 30, maxMag: 30, reserve: 90, name: 'AR-47 ASSAULT', fireRate: 110, damage: 20 },
+        1: { mag: 30, maxMag: 30, reserve: 90, name: 'AR-47 BATTLE', fireRate: 110, damage: 20 },
         2: { mag: 5, maxMag: 5, reserve: 25, name: 'AWP-50 SNIPER', fireRate: 1150, damage: 65 }
     });
 
@@ -43,7 +41,6 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
     const [killFeed, setKillFeed] = useState([]);
     const [hitBanner, setHitBanner] = useState(null);
     const [ammoToast, setAmmoToast] = useState(null);
-    const [movementToast, setMovementToast] = useState(null);
     const [damageFlash, setDamageFlash] = useState(false);
     const [isDead, setIsDead] = useState(false);
     const [respawnTimer, setRespawnTimer] = useState(0);
@@ -65,10 +62,10 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
         const canvas = canvasRef.current;
         if (!canvas) return;
 
-        // --- 1. SCÈNE, CAMÉRA & RENDERER ---
+        // --- 1. SCÈNE, CAMÉRA & RENDERER (BATTLEFIELD MILITARY ATMOSPHERE) ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x0f172a);
-        scene.fog = new THREE.FogExp2(0x0f172a, 0.005);
+        scene.background = new THREE.Color(0x0e1726);
+        scene.fog = new THREE.FogExp2(0x0e1726, 0.006);
 
         const camera = new THREE.PerspectiveCamera(
             75,
@@ -98,45 +95,48 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
 
         const bloomPass = new UnrealBloomPass(
             new THREE.Vector2(window.innerWidth, window.innerHeight),
-            0.35,
             0.3,
-            0.82
+            0.3,
+            0.85
         );
         composer.addPass(bloomPass);
 
         const outputPass = new OutputPass();
         composer.addPass(outputPass);
 
-        // --- 3. ÉCLAIRAGE HAUTE VISIBILITÉ ---
-        const ambientLight = new THREE.AmbientLight(0xffffff, 2.3);
+        // --- 3. ÉCLAIRAGE MILITAIRE HAUTE FIDÉLITÉ ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 2.2);
         scene.add(ambientLight);
 
-        const sunLight = new THREE.DirectionalLight(0xffffff, 3.4);
-        sunLight.position.set(40, 70, 50);
+        const sunLight = new THREE.DirectionalLight(0xffedd5, 3.6);
+        sunLight.position.set(50, 80, 60);
         sunLight.castShadow = true;
         sunLight.shadow.mapSize.width = 2048;
         sunLight.shadow.mapSize.height = 2048;
         sunLight.shadow.camera.near = 0.5;
-        sunLight.shadow.camera.far = 250;
-        sunLight.shadow.camera.left = -80;
-        sunLight.shadow.camera.right = 80;
-        sunLight.shadow.camera.top = 80;
-        sunLight.shadow.camera.bottom = -80;
+        sunLight.shadow.camera.far = 280;
+        sunLight.shadow.camera.left = -90;
+        sunLight.shadow.camera.right = 90;
+        sunLight.shadow.camera.top = 90;
+        sunLight.shadow.camera.bottom = -90;
         sunLight.shadow.bias = -0.0003;
         scene.add(sunLight);
 
-        const fillLight = new THREE.DirectionalLight(0x38bdf8, 1.4);
-        fillLight.position.set(-50, 30, -50);
-        scene.add(fillLight);
+        const skyFill = new THREE.DirectionalLight(0x38bdf8, 1.3);
+        skyFill.position.set(-60, 40, -60);
+        scene.add(skyFill);
 
-        // --- 4. GÉOMÉTRIE DE LA CARTE 140x140m ---
-        const floorMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.6, metalness: 0.2 });
-        const wallMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5, metalness: 0.3 });
-        const metalStructureMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.3, metalness: 0.8 });
-        const platformMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.4, metalness: 0.4 });
+        // --- 4. MAP BATTLEFIELD ÉPIQUE : "OPÉRATION MÉTRO & CASPIAN SECTOR" (140x140m) ---
+        const asphaltMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7, metalness: 0.2 });
+        const concreteMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.6, metalness: 0.3 });
+        const metalPlateMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.35, metalness: 0.8 });
+        const militaryOliveMat = new THREE.MeshStandardMaterial({ color: 0x1e3a1e, roughness: 0.5, metalness: 0.4 });
+        const rustContainerMat = new THREE.MeshStandardMaterial({ color: 0x9a3412, roughness: 0.6, metalness: 0.4 });
+        const blueContainerMat = new THREE.MeshStandardMaterial({ color: 0x0369a1, roughness: 0.5, metalness: 0.5 });
+        const metroTrainMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4, metalness: 0.7 });
+        const yellowHazardMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
         const neonCyanMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
         const neonOrangeMat = new THREE.MeshBasicMaterial({ color: 0xf97316 });
-        const neonPurpleMat = new THREE.MeshBasicMaterial({ color: 0xa855f7 });
 
         const colliders = [];
         const colliderMeshes = [];
@@ -148,26 +148,15 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             return box;
         };
 
-        const floor = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), floorMat);
-        floor.rotation.x = -Math.PI / 2;
-        floor.receiveShadow = true;
-        scene.add(floor);
+        // Sol Principal Asphalt (140x140m)
+        const ground = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), asphaltMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
 
-        const addGroundMark = (x, z, w, d, mat = neonCyanMat) => {
-            const strip = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat);
-            strip.position.set(x, 0.02, z);
-            strip.rotation.x = -Math.PI / 2;
-            scene.add(strip);
-        };
-        addGroundMark(0, 0, 120, 0.4, neonCyanMat);
-        addGroundMark(0, 0, 0.4, 120, neonCyanMat);
-        addGroundMark(-35, 0, 0.3, 80, neonOrangeMat);
-        addGroundMark(35, 0, 0.3, 80, neonOrangeMat);
-        addGroundMark(0, -35, 80, 0.3, neonPurpleMat);
-        addGroundMark(0, 35, 80, 0.3, neonPurpleMat);
-
-        const wallH = 12;
-        const addWall = (x, y, z, w, h, d, mat = wallMat) => {
+        // Murs d'Enceinte de la Carte (140x140m)
+        const wallH = 14;
+        const addSolidWall = (x, y, z, w, h, d, mat = concreteMat) => {
             const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
             wall.position.set(x, y, z);
             wall.receiveShadow = true;
@@ -175,100 +164,160 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             scene.add(wall);
             registerBox(wall);
         };
-        addWall(0, wallH / 2, -70, 140, wallH, 2);
-        addWall(0, wallH / 2, 70, 140, wallH, 2);
-        addWall(-70, wallH / 2, 0, 2, wallH, 140);
-        addWall(70, wallH / 2, 0, 2, wallH, 140);
+        addSolidWall(0, wallH / 2, -70, 140, wallH, 3);
+        addSolidWall(0, wallH / 2, 70, 140, wallH, 3);
+        addSolidWall(-70, wallH / 2, 0, 3, wallH, 140);
+        addSolidWall(70, wallH / 2, 0, 3, wallH, 140);
 
-        const addPlatform = (x, y, z, w, h, d, withRamp = true, rampDir = 'z') => {
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), platformMat);
-            mesh.position.set(x, y + h / 2, z);
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
-            scene.add(mesh);
-            registerBox(mesh);
+        // SECTEUR CENTRAL : STATION DE MÉTRO & VOIE FERRÉE (OPÉRATION MÉTRO)
+        // 1. Quai de Métro Surélevé (Largeur 26m, Longueur 40m, Hauteur 2.8m)
+        const addSolidPlatform = (x, y, z, w, h, d, mat = concreteMat) => {
+            const platform = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+            platform.position.set(x, y + h / 2, z);
+            platform.receiveShadow = true;
+            platform.castShadow = true;
+            scene.add(platform);
+            registerBox(platform);
 
-            const trim = new THREE.Mesh(new THREE.BoxGeometry(w + 0.1, 0.15, d + 0.1), neonCyanMat);
-            trim.position.set(x, y + h, z);
-            scene.add(trim);
+            // Bandes d'alerte jaune sur les bords du quai
+            const stripLeft = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.05, d), yellowHazardMat);
+            stripLeft.position.set(x - w / 2 + 0.2, y + h + 0.02, z);
+            scene.add(stripLeft);
 
-            if (withRamp) {
-                const rampLength = 8;
-                const ramp = new THREE.Mesh(new THREE.BoxGeometry(rampDir === 'z' ? 4 : rampLength, 0.3, rampDir === 'z' ? rampLength : 4), platformMat);
-                if (rampDir === 'z') {
-                    ramp.position.set(x, y + h / 2, z + d / 2 + rampLength / 2 - 0.4);
-                    ramp.rotation.x = -Math.atan2(h, rampLength);
-                } else {
-                    ramp.position.set(x + w / 2 + rampLength / 2 - 0.4, y + h / 2, z);
-                    ramp.rotation.z = Math.atan2(h, rampLength);
-                }
+            const stripRight = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.05, d), yellowHazardMat);
+            stripRight.position.set(x + w / 2 - 0.2, y + h + 0.02, z);
+            scene.add(stripRight);
+
+            // Rampes d'accès solides
+            const rampLen = 7.0;
+            const addRamp = (rx, rz, isFront) => {
+                const ramp = new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.6, rampLen), concreteMat);
+                ramp.position.set(rx, y + h / 2, rz);
+                ramp.rotation.x = isFront ? -Math.atan2(h, rampLen) : Math.atan2(h, rampLen);
                 ramp.castShadow = true;
                 ramp.receiveShadow = true;
                 scene.add(ramp);
                 registerBox(ramp);
-            }
+            };
+            addRamp(x - 6, z + d / 2 + rampLen / 2 - 0.3, true);
+            addRamp(x + 6, z + d / 2 + rampLen / 2 - 0.3, true);
+            addRamp(x - 6, z - d / 2 - rampLen / 2 + 0.3, false);
+            addRamp(x + 6, z - d / 2 - rampLen / 2 + 0.3, false);
         };
+        addSolidPlatform(0, 0, 0, 24, 2.8, 36);
 
-        addPlatform(0, 0, 0, 24, 3.5, 24, true, 'z');
-        addPlatform(0, 0, -18, 12, 3.5, 10, true, 'z');
+        // 2. Rame de Métro Déserte (Wagon Métro Central de Combat)
+        const addMetroCar = (x, z) => {
+            const carGroup = new THREE.Group();
+            carGroup.position.set(x, 2.8, z);
 
-        const addSniperTower = (x, z) => {
-            addPlatform(x, 0, z, 12, 6.0, 12, true, z > 0 ? 'z' : 'x');
-            addWall(x, 6.0 + 0.6, z - 5.5, 12, 1.2, 0.6, metalStructureMat);
-            addWall(x, 6.0 + 0.6, z + 5.5, 12, 1.2, 0.6, metalStructureMat);
-            addWall(x - 5.5, 6.0 + 0.6, z, 0.6, 1.2, 12, metalStructureMat);
-            addWall(x + 5.5, 6.0 + 0.6, z, 0.6, 1.2, 12, metalStructureMat);
+            // Toit du wagon
+            const roof = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.4, 18), metroTrainMat);
+            roof.position.y = 3.2;
+            roof.castShadow = true;
+            roof.receiveShadow = true;
+            carGroup.add(roof);
+            registerBox(roof);
+
+            // Parois latérales avec ouvertures de fenêtres/portes
+            const wallLeft = new THREE.Mesh(new THREE.BoxGeometry(0.3, 3.2, 18), metroTrainMat);
+            wallLeft.position.set(-2.25, 1.6, 0);
+            wallLeft.castShadow = true;
+            carGroup.add(wallLeft);
+            registerBox(wallLeft);
+
+            const wallRight = new THREE.Mesh(new THREE.BoxGeometry(0.3, 3.2, 18), metroTrainMat);
+            wallRight.position.set(2.25, 1.6, 0);
+            wallRight.castShadow = true;
+            carGroup.add(wallRight);
+            registerBox(wallRight);
+
+            // Panneau Enseigne Métro
+            const sign = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.5, 0.1), neonCyanMat);
+            sign.position.set(0, 3.4, 9.05);
+            carGroup.add(sign);
+
+            scene.add(carGroup);
         };
-        addSniperTower(-45, -45);
-        addSniperTower(45, -45);
-        addSniperTower(-45, 45);
-        addSniperTower(45, 45);
+        addMetroCar(0, 0);
 
-        const addBarricade = (x, z, rot = 0, isHigh = false) => {
-            const h = isHigh ? 3.0 : 1.6;
-            const w = isHigh ? 6.0 : 4.5;
-            const bar = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.8), wallMat);
-            bar.position.set(x, h / 2, z);
-            bar.rotation.y = rot;
-            bar.castShadow = true;
-            bar.receiveShadow = true;
-            scene.add(bar);
-            registerBox(bar);
-
-            const lightStrip = new THREE.Mesh(new THREE.BoxGeometry(w, 0.1, 0.85), isHigh ? neonOrangeMat : neonCyanMat);
-            lightStrip.position.set(x, h, z);
-            lightStrip.rotation.y = rot;
-            scene.add(lightStrip);
-        };
-
-        const barricadeCoords = [
-            [-22, 15, 0], [22, 15, 0], [-22, -15, 0], [22, -15, 0],
-            [0, 25, Math.PI / 2], [0, -25, Math.PI / 2],
-            [-35, 10, Math.PI / 4, true], [35, 10, -Math.PI / 4, true],
-            [-35, -10, -Math.PI / 4, true], [35, -10, Math.PI / 4, true],
-            [-15, 35, Math.PI / 2], [15, 35, Math.PI / 2],
-            [-15, -35, Math.PI / 2], [15, -35, Math.PI / 2]
-        ];
-        barricadeCoords.forEach(([x, z, rot, isHigh]) => addBarricade(x, z, rot, isHigh));
-
-        const addGiantPillar = (x, z) => {
-            const pillar = new THREE.Mesh(new THREE.BoxGeometry(3.5, wallH, 3.5), metalStructureMat);
-            pillar.position.set(x, wallH / 2, z);
+        // 3. Piliers Structuraux en Béton Armé
+        const addConcretePillars = (x, z) => {
+            const pillar = new THREE.Mesh(new THREE.BoxGeometry(2.2, 9.0, 2.2), concreteMat);
+            pillar.position.set(x, 4.5, z);
             pillar.castShadow = true;
             pillar.receiveShadow = true;
             scene.add(pillar);
             registerBox(pillar);
-
-            const ring = new THREE.Mesh(new THREE.BoxGeometry(3.7, 0.3, 3.7), neonCyanMat);
-            ring.position.set(x, 5.0, z);
-            scene.add(ring);
         };
-        addGiantPillar(-25, -25);
-        addGiantPillar(25, -25);
-        addGiantPillar(-25, 25);
-        addGiantPillar(25, 25);
+        addConcretePillars(-18, 12);
+        addConcretePillars(18, 12);
+        addConcretePillars(-18, -12);
+        addConcretePillars(18, -12);
 
-        // --- 5. MODÈLE DE COMBATTANT DISTANT ---
+        // SECTEUR ALPHA : BASE CHECKPOINT MILITAIRE (SUD)
+        // Tour Radar de Télécommunication (Hauteur 11m)
+        const addRadarTower = (x, z) => {
+            addSolidPlatform(x, 0, z, 14, 6.5, 14, concreteMat);
+            // Rambardes solides
+            addSolidWall(x, 6.5 + 0.6, z - 6.5, 14, 1.2, 0.8, metalPlateMat);
+            addSolidWall(x, 6.5 + 0.6, z + 6.5, 14, 1.2, 0.8, metalPlateMat);
+            addSolidWall(x - 6.5, 6.5 + 0.6, z, 0.8, 1.2, 14, metalPlateMat);
+            addSolidWall(x + 6.5, 6.5 + 0.6, z, 0.8, 1.2, 14, metalPlateMat);
+
+            // Antenne Radar
+            const dish = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 0.3, 16), metalPlateMat);
+            dish.position.set(x, 6.5 + 4.5, z);
+            dish.rotation.x = Math.PI / 4;
+            scene.add(dish);
+        };
+        addRadarTower(-42, 42);
+        addRadarTower(42, -42);
+
+        // Conteneurs Maritimes Militaires Empilés
+        const addShippingContainer = (x, y, z, rot = 0, mat = rustContainerMat) => {
+            const cont = new THREE.Mesh(new THREE.BoxGeometry(3.2, 3.2, 7.5), mat);
+            cont.position.set(x, y + 1.6, z);
+            cont.rotation.y = rot;
+            cont.castShadow = true;
+            cont.receiveShadow = true;
+            scene.add(cont);
+            registerBox(cont);
+        };
+        addShippingContainer(-30, 0, 22, 0, rustContainerMat);
+        addShippingContainer(-30, 3.2, 22, 0, blueContainerMat);
+        addShippingContainer(-24, 0, 26, Math.PI / 2, militaryOliveMat);
+
+        addShippingContainer(30, 0, -22, 0, blueContainerMat);
+        addShippingContainer(30, 3.2, -22, 0, rustContainerMat);
+        addShippingContainer(24, 0, -26, Math.PI / 2, militaryOliveMat);
+
+        addShippingContainer(-40, 0, -35, Math.PI / 4, rustContainerMat);
+        addShippingContainer(40, 0, 35, -Math.PI / 4, blueContainerMat);
+
+        // Barricades de Béton & Tranchées Jersey
+        const addJerseyBarrier = (x, z, rot = 0) => {
+            const b = new THREE.Mesh(new THREE.BoxGeometry(5.0, 1.4, 0.8), concreteMat);
+            b.position.set(x, 0.7, z);
+            b.rotation.y = rot;
+            b.castShadow = true;
+            b.receiveShadow = true;
+            scene.add(b);
+            registerBox(b);
+
+            const neon = new THREE.Mesh(new THREE.BoxGeometry(5.0, 0.08, 0.85), neonOrangeMat);
+            neon.position.set(x, 1.42, z);
+            neon.rotation.y = rot;
+            scene.add(neon);
+        };
+
+        [
+            [-12, 24, 0], [12, 24, 0], [-12, -24, 0], [12, -24, 0],
+            [-35, 0, Math.PI / 2], [35, 0, Math.PI / 2],
+            [-45, 15, 0], [45, 15, 0], [-45, -15, 0], [45, -15, 0]
+        ].forEach(([bx, bz, brot]) => addJerseyBarrier(bx, bz, brot));
+
+        // --- 5. MODÈLE DE JOUEUR ADVERSE ---
         const remotePlayersMap = new Map();
 
         const createRealisticPlayerModel = (name, colorHex, spawnPos) => {
@@ -279,7 +328,6 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             const darkTacticalMat = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.7, metalness: 0.3 });
             const plateMat = new THREE.MeshStandardMaterial({ color: 0x27272a, roughness: 0.4, metalness: 0.6 });
 
-            // Torse & Gilet
             const chestGroup = new THREE.Group();
             chestGroup.position.set(0, 1.15, 0);
 
@@ -298,62 +346,28 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 chestGroup.add(magPouch);
             }
 
-            const shoulderL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 0.22), plateMat);
-            shoulderL.position.set(-0.35, 0.25, 0);
-            chestGroup.add(shoulderL);
-
-            const shoulderR = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 0.22), plateMat);
-            shoulderR.position.set(0.35, 0.25, 0);
-            chestGroup.add(shoulderR);
             fighterGroup.add(chestGroup);
 
-            // Ceinture
             const belt = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.12, 0.34), plateMat);
             belt.position.set(0, 0.76, 0);
             fighterGroup.add(belt);
 
-            const holster = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.22, 0.14), darkTacticalMat);
-            holster.position.set(0.32, 0.65, 0);
-            fighterGroup.add(holster);
+            const legL = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.75, 0.24), darkTacticalMat);
+            legL.position.set(-0.16, 0.38, 0);
+            fighterGroup.add(legL);
 
-            // Jambes & Bottes
-            const legLeftGroup = new THREE.Group();
-            legLeftGroup.position.set(-0.16, 0.7, 0);
-            const thighL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.42, 0.22), darkTacticalMat);
-            thighL.position.set(0, -0.21, 0);
-            legLeftGroup.add(thighL);
-            const kneeL = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.14, 0.12), plateMat);
-            kneeL.position.set(0, -0.38, 0.1);
-            legLeftGroup.add(kneeL);
-            const bootL = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.35, 0.3), darkTacticalMat);
-            bootL.position.set(0, -0.56, 0.04);
-            legLeftGroup.add(bootL);
-            fighterGroup.add(legLeftGroup);
+            const legR = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.75, 0.24), darkTacticalMat);
+            legR.position.set(0.16, 0.38, 0);
+            fighterGroup.add(legR);
 
-            const legRightGroup = new THREE.Group();
-            legRightGroup.position.set(0.16, 0.7, 0);
-            const thighR = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.42, 0.22), darkTacticalMat);
-            thighR.position.set(0, -0.21, 0);
-            legRightGroup.add(thighR);
-            const kneeR = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.14, 0.12), plateMat);
-            kneeR.position.set(0, -0.38, 0.1);
-            legRightGroup.add(kneeR);
-            const bootR = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.35, 0.3), darkTacticalMat);
-            bootR.position.set(0, -0.56, 0.04);
-            legRightGroup.add(bootR);
-            fighterGroup.add(legRightGroup);
-
-            // Bras & Fusil d'Assaut
             const armLeft = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.55, 0.16), armorMat);
             armLeft.position.set(-0.38, 1.15, 0.2);
             armLeft.rotation.x = -Math.PI / 4;
-            armLeft.rotation.z = Math.PI / 10;
             fighterGroup.add(armLeft);
 
             const armRight = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.55, 0.16), armorMat);
             armRight.position.set(0.38, 1.15, 0.25);
             armRight.rotation.x = -Math.PI / 3;
-            armRight.rotation.z = -Math.PI / 12;
             fighterGroup.add(armRight);
 
             const rifleGroup = new THREE.Group();
@@ -378,13 +392,9 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
 
             fighterGroup.add(rifleGroup);
 
-            // Tête Cible
+            // Tête de Cible
             const headGroup = new THREE.Group();
             headGroup.position.set(0, 1.85, 0);
-
-            const neckCollar = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.12, 16), darkTacticalMat);
-            neckCollar.position.set(0, -0.15, 0);
-            headGroup.add(neckCollar);
 
             const headDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.44, 0.1, 32), new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4 }));
             headDisc.rotation.x = Math.PI / 2;
@@ -400,13 +410,9 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 headGroup.add(rMesh);
             });
 
-            const bullseyeCenter = new THREE.Mesh(new THREE.SphereGeometry(0.045, 16, 16), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-            bullseyeCenter.position.set(0, 0, 0.065);
-            headGroup.add(bullseyeCenter);
-
             fighterGroup.add(headGroup);
 
-            // Billboard Health Bar
+            // Barre de Vie 3D Billboard
             const billboardGroup = new THREE.Group();
             billboardGroup.position.set(0, 2.55, 0);
 
@@ -464,7 +470,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
         const mpClient = new MultiplayerClient();
 
         mpClient.callbacks.onInitState = (data) => {
-            setNetworkStatus(`Connecté au Salon • ${data.players.length} Joueur(s)`);
+            setNetworkStatus(`En ligne • ${data.players.length} Joueur(s)`);
             if (data.mySpawn) {
                 camera.position.set(data.mySpawn[0], data.mySpawn[1], data.mySpawn[2]);
             }
@@ -482,7 +488,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 const model = createRealisticPlayerModel(p.name, p.color, p.pos || [0, 1.7, 0]);
                 remotePlayersMap.set(p.id, model);
                 setConnectedPlayersCount((prev) => prev + 1);
-                setKillFeed((prev) => [`🎮 ${p.name} a rejoint le combat`, ...prev.slice(0, 4)]);
+                setKillFeed((prev) => [`🎮 ${p.name} a rejoint`, ...prev.slice(0, 4)]);
             }
         };
 
@@ -517,7 +523,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                     setIsDead(true);
                     setLastKiller(data.shooterName || 'Un combattant');
                     setPlayerDeaths((d) => d + 1);
-                    setKillFeed((prev) => [`💀 ${data.shooterName} vous a éliminé (${data.hitType})`, ...prev.slice(0, 4)]);
+                    setKillFeed((prev) => [`💀 ${data.shooterName} vous a éliminé`, ...prev.slice(0, 4)]);
 
                     let count = 3;
                     setRespawnTimer(count);
@@ -548,7 +554,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                     if (data.isKill) {
                         targetModel.rotation.x = Math.PI / 2;
                         targetModel.position.y = 0.2;
-                        setKillFeed((prev) => [`⚡ ${data.shooterName} a éliminé ${data.targetName} (${data.hitType})`, ...prev.slice(0, 4)]);
+                        setKillFeed((prev) => [`⚡ ${data.shooterName} a éliminé ${data.targetName}`, ...prev.slice(0, 4)]);
                         setTimeout(() => {
                             targetModel.visible = false;
                         }, 2000);
@@ -588,12 +594,12 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
 
         // --- 7. CAISSES DE MUNITIONS ---
         const ammoCrates = [];
-        const crateMat = new THREE.MeshStandardMaterial({ color: 0x14532d, roughness: 0.4, metalness: 0.5 });
+        const crateMat = new THREE.MeshStandardMaterial({ color: 0x1e3a1e, roughness: 0.4, metalness: 0.5 });
         const iconGlowMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
 
         const crateLocations = [
-            [-25, 0, 25], [25, 0, 25], [-25, 0, -25], [25, 0, -25],
-            [0, 3.5, 0], [-45, 6.0, -45], [45, 6.0, 45], [0, 0, 40]
+            [-20, 0, 20], [20, 0, 20], [-20, 0, -20], [20, 0, -20],
+            [0, 2.8, 0], [-42, 6.5, 42], [42, 6.5, -42], [0, 0, 40]
         ];
         crateLocations.forEach(([x, y, z]) => {
             const crateGroup = new THREE.Group();
@@ -621,13 +627,13 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             registerBox(box);
         });
 
-        // --- 8. ARME DU JOUEUR LOCAL : RESTAURATION COMPLÈTE DE L'ARME D'ORIGINE + SNIPER ---
+        // --- 8. ARME DU JOUEUR LOCAL : AR-47 & AWP-50 SNIPER ---
         const weaponPivot = new THREE.Group();
         const gunMetalMat = new THREE.MeshStandardMaterial({ color: 0x18181b, metalness: 0.85, roughness: 0.3 });
         const gunSteelMat = new THREE.MeshStandardMaterial({ color: 0x3f3f46, metalness: 0.9, roughness: 0.2 });
         const sightGlowMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
 
-        // MODÈLE 1 : FUSIL D'ASSAUT D'ORIGINE (AR-47 COMPLET)
+        // MODÈLE 1 : FUSIL D'ASSAUT AR-47
         const arMeshGroup = new THREE.Group();
 
         const arBody = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.14, 0.6), gunMetalMat);
@@ -671,7 +677,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
 
         weaponPivot.add(arMeshGroup);
 
-        // MODÈLE 2 : FUSIL SNIPER LOURD (AWP-50)
+        // MODÈLE 2 : FUSIL SNIPER AWP-50
         const sniperMeshGroup = new THREE.Group();
         sniperMeshGroup.visible = false;
 
@@ -790,9 +796,9 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             });
         };
 
-        // --- 10. RECHARGEMENT POLI ---
+        // --- 10. RECHARGEMENT ---
         let currentWeaponsAmmo = {
-            1: { mag: 30, maxMag: 30, reserve: 90, name: 'AR-47 ASSAULT', fireRate: 110, damage: 20 },
+            1: { mag: 30, maxMag: 30, reserve: 90, name: 'AR-47 BATTLE', fireRate: 110, damage: 20 },
             2: { mag: 5, maxMag: 5, reserve: 25, name: 'AWP-50 SNIPER', fireRate: 1150, damage: 65 }
         };
 
@@ -813,7 +819,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             sound.playReload();
         };
 
-        // --- 11. CONTRÔLES, AUTO-SPRINT, GLISSADE TACTIQUE (FIX DIRECTION & COOLDOWN) ---
+        // --- 11. CONTRÔLES, AUTO-SPRINT, GLISSADE & EFFETS SONORES DE MOUVEMENT ---
         const controls = new PointerLockControls(camera, canvas);
         controls.addEventListener('lock', () => setIsLocked(true));
         controls.addEventListener('unlock', () => {
@@ -829,6 +835,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
         let slideTimer = 0;
         let slideCooldown = 0;
         let wallJumpCooldown = 0;
+        let footstepTimer = 0;
         let normalEyeHeight = 1.7;
         let currentEyeHeight = 1.7;
 
@@ -860,10 +867,10 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 case 'ControlLeft':
                 case 'ControlRight':
                     moveState.crouch = true;
+                    sound.playCrouch();
                     const isMoving = moveState.forward || moveState.backward || moveState.left || moveState.right;
                     const shouldSprint = autoSprintRef.current || moveState.sprint;
 
-                    // DÉCLENCHEMENT DE LA GLISSADE : DEVANT NOUS AVEC COOLDOWN
                     if (isMoving && shouldSprint && canJump && !sliding && slideCooldown <= 0) {
                         const forward = new THREE.Vector3();
                         camera.getWorldDirection(forward);
@@ -884,16 +891,12 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
 
                         sliding = true;
                         slideTimer = 0.65;
-                        slideCooldown = 1.3; // Empêche le spam de glissade en boucle
+                        slideCooldown = 1.3;
                         setIsSliding(true);
                         sound.playSlide();
-                        setMovementToast('⚡ GLISSADE');
-                        setTimeout(() => setMovementToast(null), 900);
 
                         velocity.x = slideDir.x * 18.0;
                         velocity.z = slideDir.z * 18.0;
-                    } else {
-                        setIsCrouching(true);
                     }
                     break;
 
@@ -901,6 +904,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                     if (canJump) {
                         velocity.y = 8.8;
                         canJump = false;
+                        sound.playJump();
                     } else if (wallJumpCooldown <= 0) {
                         const rayAngles = [0, Math.PI / 4, Math.PI / 2, 3 * Math.PI / 4, Math.PI, -3 * Math.PI / 4, -Math.PI / 2, -Math.PI / 4];
                         let foundWall = false;
@@ -923,8 +927,6 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                             velocity.z += wallNormal.z * 11.0;
                             wallJumpCooldown = 0.45;
                             sound.playWallJump();
-                            setMovementToast('🧗 WALL JUMP !');
-                            setTimeout(() => setMovementToast(null), 1000);
                         }
                     }
                     break;
@@ -946,7 +948,6 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 case 'ControlLeft':
                 case 'ControlRight':
                     moveState.crouch = false;
-                    setIsCrouching(false);
                     sliding = false;
                     setIsSliding(false);
                     break;
@@ -962,7 +963,6 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
         window.addEventListener('keyup', onKeyUp);
         window.addEventListener('wheel', onWheel);
 
-        // --- TIR AVEC CADENCE RESPECTÉE ---
         const fireWeapon = () => {
             if (!controls.isLocked || reloading || isDead) return;
 
@@ -1044,27 +1044,27 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             const distToHeadCenter = hitPoint.distanceTo(headWorldPos);
 
             let damage = isSniper ? 65 : 20;
-            let hitType = isSniper ? '💥 SNIPER CORPS (65 DMG)' : 'CORPS (20 DMG)';
+            let hitType = isSniper ? 'SNIPER (65 DMG)' : 'CORPS (20 DMG)';
             let isHeadshot = false;
 
             if (distToHeadCenter <= 0.45) {
                 isHeadshot = true;
                 if (distToHeadCenter <= 0.10) {
                     damage = 100;
-                    hitType = isSniper ? '🎯 ONE-SHOT SNIPER HEADSHOT ! (100 DMG)' : '🎯 BULLSEYE HEADSHOT ! (100 DMG)';
+                    hitType = isSniper ? '🎯 ONE-SHOT HEADSHOT !' : '🎯 BULLSEYE HEADSHOT !';
                 } else if (distToHeadCenter <= 0.24) {
                     damage = isSniper ? 100 : 65;
-                    hitType = '🔴 ANNEAU ROUGE (TÊTE)';
+                    hitType = '🔴 ANNEAU ROUGE';
                 } else if (distToHeadCenter <= 0.36) {
                     damage = isSniper ? 85 : 40;
-                    hitType = '🔵 ANNEAU BLEU (TÊTE)';
+                    hitType = '🔵 ANNEAU BLEU';
                 } else {
                     damage = isSniper ? 75 : 25;
-                    hitType = '⚪ BORD DE CIBLE';
+                    hitType = '⚪ CIBLE';
                 }
             } else if (hitPoint.y < headWorldPos.y - 0.9) {
                 damage = isSniper ? 50 : 15;
-                hitType = isSniper ? 'SNIPER JAMBE (50 DMG)' : 'JAMBES (15 DMG)';
+                hitType = isSniper ? 'JAMBE (50 DMG)' : 'JAMBE (15 DMG)';
             }
 
             setHitBanner({ type: hitType, isHeadshot, damage });
@@ -1090,14 +1090,12 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             if (wallJumpCooldown > 0) wallJumpCooldown -= delta;
             if (slideCooldown > 0) slideCooldown -= delta;
 
-            // Tir automatique pour l'AR-47
             if (isMouseDown && currentWeaponSlot === 1 && !reloading && !isDead && controls.isLocked) {
                 if (time - lastShotTime >= currentWeaponsAmmo[1].fireRate) {
                     fireWeapon();
                 }
             }
 
-            // ANIMATION DE RECHARGEMENT POLIE
             const activeGunGroup = currentWeaponSlot === 1 ? arMeshGroup : sniperMeshGroup;
             if (reloading) {
                 reloadTimer += delta;
@@ -1144,14 +1142,12 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 activeGunGroup.rotation.z = 0;
             }
 
-            // Synchronisation réseau du joueur local (25 FPS)
             if (controls.isLocked && time - lastSyncTime > 40 && !isDead) {
                 lastSyncTime = time;
                 const camRotY = camera.rotation.y;
                 mpClient.sendMove(camera.position, camRotY, camera.rotation.x, isAimingADS);
             }
 
-            // Interpolation et Billboard Health Bar des autres combattants
             for (const [id, f] of remotePlayersMap.entries()) {
                 f.position.lerp(f.userData.targetPos, delta * 12);
                 f.rotation.y = THREE.MathUtils.lerp(f.rotation.y, f.userData.targetRotY, delta * 12);
@@ -1189,7 +1185,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 }
             });
 
-            // Physique des Balles 3D
+            // Balles
             for (let i = bullets.length - 1; i >= 0; i--) {
                 const b = bullets[i];
                 const stepDist = b.speed * delta;
@@ -1242,7 +1238,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 }
             }
 
-            // DÉPLACEMENT DU JOUEUR LOCAL
+            // DÉPLACEMENT DU JOUEUR LOCAL SANS AUCUN PASS-THROUGH
             if (controls.isLocked && !isDead) {
                 if (sliding) {
                     slideTimer -= delta;
@@ -1269,9 +1265,23 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 if (moveState.right) dir.x += 1;
                 dir.normalize();
 
+                const isMoving = moveState.forward || moveState.backward || moveState.left || moveState.right;
+
                 if (!sliding) {
                     if (moveState.forward || moveState.backward) velocity.z += dir.z * baseSpeed * 10.0 * delta;
                     if (moveState.left || moveState.right) velocity.x += dir.x * baseSpeed * 10.0 * delta;
+                }
+
+                // BRUITS DE PAS DYNAMIQUES
+                if (isMoving && canJump && !sliding) {
+                    footstepTimer += delta;
+                    const stepInterval = shouldSprint ? 0.28 : 0.44;
+                    if (footstepTimer >= stepInterval) {
+                        footstepTimer = 0;
+                        sound.playFootstep(shouldSprint);
+                    }
+                } else {
+                    footstepTimer = 0.2;
                 }
 
                 // Collisions Horizontales X
@@ -1307,7 +1317,8 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 const targetEye = sliding ? 0.85 : moveState.crouch ? 0.95 : normalEyeHeight;
                 currentEyeHeight = THREE.MathUtils.lerp(currentEyeHeight, targetEye, delta * 12);
 
-                // DÉTECTION DU SOL PRÉCISE
+                // DÉTECTION DU SOL & ANTI-CLIPPING VERTICAL
+                const wasAirborne = !canJump;
                 camera.position.y += velocity.y * delta;
                 let groundY = currentEyeHeight;
 
@@ -1319,14 +1330,24 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                         camera.position.z <= col.max.z + 0.45
                     ) {
                         const topY = col.max.y + currentEyeHeight;
+                        // On ne monte que si les pieds sont à la hauteur de la surface supérieure
                         if (camera.position.y >= topY - 0.45 && topY >= groundY) {
                             groundY = topY;
+                        }
+
+                        // Anti-traversée par le bas (plafond sous plateforme)
+                        if (velocity.y > 0 && camera.position.y >= col.min.y - 0.1 && camera.position.y <= col.max.y) {
+                            camera.position.y = col.min.y - 0.1;
+                            velocity.y = 0;
                         }
                     }
                 }
 
                 if (camera.position.y <= groundY) {
                     camera.position.y = groundY;
+                    if (wasAirborne && velocity.y < -4.0) {
+                        sound.playLand();
+                    }
                     velocity.y = 0;
                     canJump = true;
                 }
@@ -1336,18 +1357,16 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, delta * 14);
                 camera.updateProjectionMatrix();
 
-                // Position de l'arme : Si Sniper ADS -> abaisser l'arme pour dégager la vue
                 let targetPivotPos = hipPosition;
                 if (isAimingADS) {
                     if (currentWeaponSlot === 1) {
                         targetPivotPos = arAdsPos;
                     } else {
-                        targetPivotPos = new THREE.Vector3(0, -1.2, 0); // Dégage la lunette plein écran
+                        targetPivotPos = new THREE.Vector3(0, -1.2, 0);
                     }
                 }
                 weaponPivot.position.lerp(targetPivotPos, delta * 16);
 
-                const isMoving = moveState.forward || moveState.backward || moveState.left || moveState.right;
                 if (isMoving && canJump && !isAimingADS && !reloading && !sliding) {
                     bobTimer += delta * (shouldSprint ? 14 : 9);
                     weaponPivot.position.x = Math.sin(bobTimer) * 0.015;
@@ -1406,7 +1425,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 <div className="pointer-events-none absolute inset-0 border-[6px] border-cyan-400/80 bg-cyan-500/10 z-30 animate-pulse"></div>
             )}
 
-            {/* LUNETTE DE SNIPER TACTIQUE PLEIN ÉCRAN ULTRA-CLAIRE (ADS SNIPER) */}
+            {/* LUNETTE DE SNIPER TACTIQUE PLEIN ÉCRAN ULTRA-CLAIRE */}
             {isLocked && isAiming && activeWeaponSlot === 2 && !isDead && (
                 <div
                     className="pointer-events-none absolute inset-0 flex items-center justify-center z-30"
@@ -1415,12 +1434,10 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                     }}
                 >
                     <div className="relative w-[520px] h-[520px] rounded-full border-2 border-emerald-400/80 shadow-[0_0_40px_rgba(16,185,129,0.3)] flex items-center justify-center">
-                        {/* Réticule Mil-Dot */}
                         <div className="absolute w-full h-[1.5px] bg-emerald-400/80"></div>
                         <div className="absolute h-full w-[1.5px] bg-emerald-400/80"></div>
                         <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,1)]"></div>
 
-                        {/* Graduations de distance */}
                         <div className="absolute top-1/4 w-8 h-[1px] bg-emerald-400/70"></div>
                         <div className="absolute top-1/3 w-12 h-[1.5px] bg-emerald-400/70"></div>
                         <div className="absolute bottom-1/3 w-12 h-[1.5px] bg-emerald-400/70"></div>
@@ -1472,7 +1489,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 </div>
             )}
 
-            {/* Réticule de visée normal (masqué lors du scope sniper) */}
+            {/* Réticule de visée normal */}
             {isLocked && !isDead && !(isAiming && activeWeaponSlot === 2) && (
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                     <div className="relative flex items-center justify-center">
@@ -1490,7 +1507,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 </div>
             )}
 
-            {/* Bannière de Touche / Bullseye */}
+            {/* Bannière de Touche */}
             {hitBanner && (
                 <div className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 animate-bounce">
                     <div className={`px-6 py-2.5 rounded-xl font-black text-sm uppercase tracking-widest shadow-2xl backdrop-blur border ${
@@ -1503,16 +1520,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 </div>
             )}
 
-            {/* Toast Mouvement (Wall Jump / Slide) */}
-            {movementToast && (
-                <div className="pointer-events-none absolute top-1/4 left-1/2 -translate-x-1/2 z-30">
-                    <div className="bg-cyan-500/90 text-zinc-950 font-black px-4 py-1.5 rounded-full text-xs uppercase tracking-widest shadow-[0_0_15px_rgba(6,182,212,0.8)] animate-pulse">
-                        {movementToast}
-                    </div>
-                </div>
-            )}
-
-            {/* KillFeed en haut à droite */}
+            {/* KillFeed épuré en haut à droite */}
             <div className="pointer-events-none absolute top-20 right-8 flex flex-col space-y-2 z-30">
                 {killFeed.map((kf, i) => (
                     <div key={i} className="bg-slate-900/90 border border-slate-700/80 text-xs px-3.5 py-1.5 rounded-lg text-slate-200 shadow-lg animate-fadeIn">
@@ -1521,7 +1529,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 ))}
             </div>
 
-            {/* HUD Supérieur */}
+            {/* HUD Supérieur Battlefield Minimaliste */}
             <div className="pointer-events-none absolute top-6 left-8 right-8 flex items-center justify-between text-white">
                 <div className="flex items-center space-x-6 bg-slate-900/85 backdrop-blur border border-slate-700/70 px-5 py-3 rounded-xl shadow-xl">
                     <div>
@@ -1541,7 +1549,6 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 </div>
 
                 <div className="flex items-center space-x-3 pointer-events-auto">
-                    {/* Bouton Option Course Auto */}
                     <button
                         onClick={toggleAutoSprint}
                         className={`px-3.5 py-1.5 rounded-lg text-xs font-bold tracking-wider uppercase border transition-all cursor-pointer ${
@@ -1550,12 +1557,12 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                                 : 'bg-slate-800/80 border-slate-700 text-slate-400 hover:text-white'
                         }`}
                     >
-                        ⚡ COURSE AUTO: {autoSprint ? 'ON' : 'OFF'}
+                        ⚡ SPRINT AUTO: {autoSprint ? 'ON' : 'OFF'}
                     </button>
 
                     <div className="bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 px-3.5 py-1.5 rounded-lg text-xs font-semibold tracking-wide flex items-center space-x-2">
                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                        <span>MULTIJOUEUR • {connectedPlayersCount} / 4 JOUEURS</span>
+                        <span>OPÉRATION MÉTRO • {connectedPlayersCount} / 4 JOUEURS</span>
                     </div>
 
                     {ammoToast && (
@@ -1567,7 +1574,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 </div>
             </div>
 
-            {/* SÉLECTEUR D'ARMES RAPIDE */}
+            {/* Sélecteur d'Armes */}
             <div className="pointer-events-none absolute bottom-28 right-8 flex space-x-2 z-30">
                 <div className={`px-4 py-2 rounded-xl border backdrop-blur text-xs font-bold transition-all ${
                     activeWeaponSlot === 1
@@ -1588,11 +1595,11 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 </div>
             </div>
 
-            {/* Barre de Vie (HP) du Joueur en bas à gauche */}
+            {/* Barre de Vie (HP) du Joueur */}
             <div className="pointer-events-none absolute bottom-6 left-8 z-30">
                 <div className="bg-slate-900/90 backdrop-blur border border-slate-700/80 p-4 rounded-xl shadow-2xl w-64 space-y-2">
                     <div className="flex justify-between items-center text-xs">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Santé du Joueur</span>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Santé</span>
                         <span className={`font-black ${playerHp > 40 ? 'text-emerald-400' : 'text-red-400 animate-pulse'}`}>{playerHp} / 100 HP</span>
                     </div>
                     <div className="w-full h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-700/60">
@@ -1604,7 +1611,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 </div>
             </div>
 
-            {/* Indicateur de Rechargement Animé au Centre */}
+            {/* Rechargement Animé */}
             {isReloading && (
                 <div className="pointer-events-none absolute bottom-28 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center space-y-2">
                     <div className="relative w-16 h-16 flex items-center justify-center">
@@ -1629,17 +1636,17 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                         <span className="absolute text-xs font-black text-cyan-300">{reloadProgress}%</span>
                     </div>
                     <div className="bg-slate-900/90 border border-cyan-500/50 text-cyan-300 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest shadow-lg animate-pulse">
-                        🔄 RECHARGEMENT {currentWeapon.name}...
+                        🔄 RECHARGEMENT...
                     </div>
                 </div>
             )}
 
-            {/* HUD Munitions en bas à droite */}
+            {/* HUD Munitions */}
             <div className="pointer-events-none absolute bottom-6 right-8 flex flex-col items-end z-30">
                 <div className="bg-slate-900/90 backdrop-blur border border-slate-700/80 px-6 py-4 rounded-xl shadow-2xl flex items-baseline space-x-3 text-white">
                     <div className="flex flex-col items-start mr-3">
                         <span className="text-[10px] uppercase tracking-widest text-cyan-400 font-bold">{currentWeapon.name}</span>
-                        <span className="text-[9px] text-slate-500">MOLETTE / [1,2] POUR CHANGER</span>
+                        <span className="text-[9px] text-slate-500">MOLETTE / [1,2]</span>
                     </div>
                     <div className={`text-4xl font-black tracking-tight ${currentWeapon.mag <= 2 ? 'text-red-500 animate-pulse' : 'text-cyan-400'}`}>
                         {currentWeapon.mag}
@@ -1652,12 +1659,12 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
 
                 {currentWeapon.mag === 0 && !isReloading && (
                     <div className="mt-2 bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-widest animate-bounce">
-                        ⚠️ APPUYEZ SUR [R] POUR RECHARGER
+                        ⚠️ [R] POUR RECHARGER
                     </div>
                 )}
             </div>
 
-            {/* Overlay d'accueil / Pause */}
+            {/* Menu Pause */}
             {!isLocked && !isDead && (
                 <div className="absolute inset-0 bg-black/65 backdrop-blur-sm flex flex-col items-center justify-center z-50">
                     <div className="bg-slate-900/95 border border-slate-700 p-8 rounded-2xl max-w-lg w-full text-center shadow-2xl space-y-6">
@@ -1666,14 +1673,13 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                         </div>
                         <div>
                             <h2 className="text-2xl font-black text-white tracking-wide uppercase">
-                                Arène Multijoueur Tactique (140x140m)
+                                Opération Métro • Caspian Sector (140x140m)
                             </h2>
                             <p className="text-xs text-slate-400 mt-2">
-                                {networkStatus} • Affrontez de vrais joueurs avec AR-47 & Sniper AWP-50 !
+                                {networkStatus} • Carte Battlefield avec Quai de Métro, Wagon de Combat & Base Militaire !
                             </p>
                         </div>
 
-                        {/* Options en jeu */}
                         <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/80 flex items-center justify-between">
                             <span className="text-xs font-bold text-slate-200">Course Automatique (Auto-Sprint)</span>
                             <button
@@ -1688,15 +1694,14 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                             </button>
                         </div>
 
-                        {/* Guide des Commandes Avancées */}
                         <div className="grid grid-cols-2 gap-2 text-left text-xs bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/80 text-slate-300">
-                            <div><span className="font-bold text-cyan-400">[1 / 2 / Molette]</span> : Changer d'arme</div>
+                            <div><span className="font-bold text-cyan-400">[1 / 2 / Molette]</span> : Armes</div>
                             <div><span className="font-bold text-cyan-400">[Z,Q,S,D]</span> : Déplacement</div>
                             <div><span className="font-bold text-cyan-400">[ESPACE]</span> : Saut / <span className="text-amber-400 font-bold">Wall Jump</span></div>
                             <div><span className="font-bold text-cyan-400">[C / CTRL]</span> : Accroupi</div>
                             <div><span className="font-bold text-amber-400">[Sprint + C]</span> : <span className="text-amber-400 font-bold">Glissade</span></div>
                             <div><span className="font-bold text-cyan-400">[R]</span> : Recharger</div>
-                            <div><span className="font-bold text-cyan-400">[CLIC DROIT]</span> : Viser (Scope / ADS)</div>
+                            <div><span className="font-bold text-cyan-400">[CLIC DROIT]</span> : Viser</div>
                             <div><span className="font-bold text-cyan-400">[CLIC GAUCHE]</span> : Tirer</div>
                         </div>
 
@@ -1708,7 +1713,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                                 }}
                                 className="w-full py-3.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl text-sm uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(6,182,212,0.4)] cursor-pointer"
                             >
-                                Entrer dans la Partie
+                                Déployer dans la Partie
                             </button>
                             <button
                                 onClick={() => onExitRef.current()}
