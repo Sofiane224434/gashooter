@@ -325,6 +325,78 @@ class SoundEngine {
             osc.stop(now + 0.18);
         } catch (e) {}
     }
+
+    playSniperShot() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+            const now = this.ctx.currentTime;
+            // Détonation lourde
+            if (this.noiseBuffer) {
+                const noiseSrc = this.ctx.createBufferSource();
+                noiseSrc.buffer = this.noiseBuffer;
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(3200, now);
+                filter.frequency.exponentialRampToValueAtTime(150, now + 0.35);
+                const noiseGain = this.ctx.createGain();
+                noiseGain.gain.setValueAtTime(this.volume * 1.0, now);
+                noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+                noiseSrc.connect(filter);
+                filter.connect(noiseGain);
+                noiseGain.connect(this.ctx.destination);
+                noiseSrc.start(now);
+                noiseSrc.stop(now + 0.4);
+            }
+            // Coup de canon basse fréquence (sub boom)
+            const subOsc = this.ctx.createOscillator();
+            const subGain = this.ctx.createGain();
+            subOsc.type = 'sine';
+            subOsc.frequency.setValueAtTime(95, now);
+            subOsc.frequency.exponentialRampToValueAtTime(20, now + 0.45);
+            subGain.gain.setValueAtTime(this.volume * 1.0, now);
+            subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+            subOsc.connect(subGain);
+            subGain.connect(this.ctx.destination);
+            subOsc.start(now);
+            subOsc.stop(now + 0.5);
+        } catch (e) {}
+    }
+
+    playBoltAction() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+            const now = this.ctx.currentTime;
+            // Ouverture culasse
+            const osc1 = this.ctx.createOscillator();
+            const gain1 = this.ctx.createGain();
+            osc1.type = 'sawtooth';
+            osc1.frequency.setValueAtTime(650, now);
+            osc1.frequency.exponentialRampToValueAtTime(1200, now + 0.08);
+            gain1.gain.setValueAtTime(this.volume * 0.4, now);
+            gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+            osc1.connect(gain1);
+            gain1.connect(this.ctx.destination);
+            osc1.start(now);
+            osc1.stop(now + 0.08);
+
+            // Fermeture culasse
+            const osc2 = this.ctx.createOscillator();
+            const gain2 = this.ctx.createGain();
+            osc2.type = 'sawtooth';
+            osc2.frequency.setValueAtTime(1100, now + 0.25);
+            osc2.frequency.exponentialRampToValueAtTime(350, now + 0.35);
+            gain2.gain.setValueAtTime(this.volume * 0.45, now + 0.25);
+            gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+            osc2.connect(gain2);
+            gain2.connect(this.ctx.destination);
+            osc2.start(now + 0.25);
+            osc2.stop(now + 0.35);
+        } catch (e) {}
+    }
 }
 
 export const sound = new SoundEngine();
