@@ -2102,11 +2102,23 @@ export default function FirstPersonMap({ onExit, onQuitPage, initialMode = 'mult
                 </div>
             )}
 
-            {/* Indicateur de curseur libre quand ALT est maintenu */}
+            {/* Indicateur de curseur libre quand ALT est maintenu avec bouton d'accès direct au menu */}
             {isAltHeld && (
-                <div className="pointer-events-none absolute top-7 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 bg-slate-900/90 border border-amber-400/80 px-5 py-2 rounded-full shadow-[0_0_25px_rgba(245,158,11,0.4)] text-amber-300 text-xs sm:text-sm font-bold uppercase tracking-widest font-rajdhani animate-pulse">
-                    <span>🖱️</span>
-                    <span>CURSEUR LIBRE [ALT] • Relâchez pour verrouiller la visée</span>
+                <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-slate-900/95 border-2 border-cyan-400 px-5 sm:px-6 py-2 rounded-full shadow-[0_0_30px_rgba(6,182,212,0.5)] text-white text-xs sm:text-sm font-bold uppercase tracking-wider font-rajdhani animate-fadeIn pointer-events-auto">
+                    <div className="flex items-center gap-2 text-amber-300">
+                        <span className="text-base animate-bounce">🖱️</span>
+                        <span>CURSEUR ACTIF [ALT]</span>
+                    </div>
+                    <div className="w-px h-4 bg-slate-700"></div>
+                    <button
+                        onClick={() => onExitRef.current()}
+                        className="px-4 py-1 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black rounded-lg shadow-[0_0_15px_rgba(6,182,212,0.6)] transition-all transform hover:scale-105 cursor-pointer uppercase text-xs tracking-wider flex items-center gap-1.5"
+                    >
+                        <span>🚪</span>
+                        <span>RETOUR AU MENU</span>
+                    </button>
+                    <div className="w-px h-4 bg-slate-700"></div>
+                    <span className="text-[11px] text-slate-400 font-medium">Relâchez pour viser</span>
                 </div>
             )}
 
@@ -2217,6 +2229,20 @@ export default function FirstPersonMap({ onExit, onQuitPage, initialMode = 'mult
                 </div>
 
                 <div className="flex items-center space-x-3 pointer-events-auto">
+                    {/* Bouton MENU accessible au clic (notamment en maintenant ALT) */}
+                    <button
+                        onClick={() => onExitRef.current()}
+                        className={`px-3.5 py-1.5 rounded-lg text-xs font-bold tracking-wider uppercase border transition-all cursor-pointer flex items-center space-x-1.5 ${
+                            isAltHeld
+                                ? 'bg-cyan-500 text-slate-950 border-cyan-300 shadow-[0_0_20px_rgba(6,182,212,0.8)] scale-105 animate-pulse'
+                                : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white hover:border-cyan-500/50'
+                        }`}
+                        title="Retourner au Menu Principal"
+                    >
+                        <span>⚙️</span>
+                        <span>MENU</span>
+                    </button>
+
                     <button
                         onClick={toggleAutoSprint}
                         className={`px-3.5 py-1.5 rounded-lg text-xs font-bold tracking-wider uppercase border transition-all cursor-pointer ${
@@ -2395,18 +2421,6 @@ export default function FirstPersonMap({ onExit, onQuitPage, initialMode = 'mult
                                 className="w-full py-2.5 bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-slate-300 hover:text-white rounded-xl text-xs uppercase tracking-wider transition-colors cursor-pointer font-bold"
                             >
                                 Retour au Menu Principal
-                            </button>
-                            <button
-                                onClick={() => {
-                                    if (onQuitPageRef.current) {
-                                        onQuitPageRef.current();
-                                    } else {
-                                        window.close();
-                                    }
-                                }}
-                                className="w-full py-2.5 bg-red-950/50 hover:bg-red-900/60 border border-red-500/50 text-red-300 hover:text-red-200 rounded-xl text-xs uppercase tracking-wider transition-colors cursor-pointer font-bold"
-                            >
-                                🚪 Quitter le Jeu (Fermer la Page)
                             </button>
                         </div>
                     </div>
