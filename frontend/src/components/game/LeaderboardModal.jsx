@@ -13,14 +13,21 @@ export default function LeaderboardModal({ isOpen, onClose }) {
     ];
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-            <div className="relative w-full max-w-3xl bg-slate-950/95 border-2 border-amber-500/60 rounded-2xl p-6 sm:p-8 shadow-[0_0_50px_rgba(245,158,11,0.3)] text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn font-rajdhani">
+            <div className="relative w-full max-w-3xl rounded-3xl bg-slate-900/90 backdrop-blur-xl border border-slate-700/80 hud-scanlines p-6 sm:p-8 shadow-[0_0_50px_rgba(6,182,212,0.2)] text-white">
+                {/* Crochets d'angle HUD */}
+                <div className="absolute -top-[2px] -left-[2px] w-7 h-7 border-t-2 border-l-2 border-cyan-400 rounded-tl-3xl shadow-[0_0_10px_#22d3ee] pointer-events-none"></div>
+                <div className="absolute -top-[2px] -right-[2px] w-7 h-7 border-t-2 border-r-2 border-cyan-400 rounded-tr-3xl shadow-[0_0_10px_#22d3ee] pointer-events-none"></div>
+                <div className="absolute -bottom-[2px] -left-[2px] w-7 h-7 border-b-2 border-l-2 border-cyan-400 rounded-bl-3xl shadow-[0_0_10px_#22d3ee] pointer-events-none"></div>
+                <div className="absolute -bottom-[2px] -right-[2px] w-7 h-7 border-b-2 border-r-2 border-cyan-400 rounded-br-3xl shadow-[0_0_10px_#22d3ee] pointer-events-none"></div>
+                <div className="absolute -bottom-[2px] left-1/2 -translate-x-1/2 w-32 h-[3px] bg-cyan-400 rounded-full shadow-[0_0_12px_#22d3ee]"></div>
+
                 {/* Header */}
-                <div className="flex items-center justify-between border-b border-amber-500/30 pb-4 mb-6">
+                <div className="flex items-center justify-between border-b border-cyan-500/30 pb-4 mb-6">
                     <div className="flex items-center gap-3">
-                        <span className="w-3 h-3 rounded-full bg-amber-400 animate-pulse"></span>
-                        <h2 className="text-2xl sm:text-3xl font-black tracking-wider text-amber-400 font-mono">
-                            // CLASSEMENT GALACTIQUE
+                        <span className="w-3 h-3 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_#22d3ee]"></span>
+                        <h2 className="text-2xl sm:text-3xl font-black tracking-wider text-cyan-300 font-orbitron uppercase">
+                            Classement Galactique
                         </h2>
                     </div>
                     <button
@@ -29,16 +36,16 @@ export default function LeaderboardModal({ isOpen, onClose }) {
                             onClose();
                         }}
                         onMouseEnter={() => sound.playHover()}
-                        className="px-3 py-1 bg-red-500/20 hover:bg-red-500/40 text-red-400 border border-red-500/50 rounded-lg text-sm font-mono transition-all cursor-pointer"
+                        className="px-4 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-600 rounded-xl text-xs font-bold tracking-wider transition-all cursor-pointer"
                     >
-                        FERMER [ESC]
+                        FERMER [ÉCHAP]
                     </button>
                 </div>
 
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left font-mono text-sm">
+                    <table className="w-full text-left text-sm sm:text-base">
                         <thead>
-                            <tr className="border-b border-white/10 text-gray-400 text-xs uppercase">
+                            <tr className="border-b border-white/10 text-slate-400 text-xs font-bold uppercase tracking-wider">
                                 <th className="pb-3">RANG</th>
                                 <th className="pb-3">PILOTE</th>
                                 <th className="pb-3">SCORE</th>
@@ -48,21 +55,21 @@ export default function LeaderboardModal({ isOpen, onClose }) {
                         </thead>
                         <tbody className="divide-y divide-white/5">
                             {scores.map((s) => (
-                                <tr key={s.rank} className="hover:bg-amber-500/10 transition-colors">
-                                    <td className="py-3 font-bold text-amber-400">
+                                <tr key={s.rank} className="hover:bg-cyan-500/10 transition-colors">
+                                    <td className="py-3 font-bold text-cyan-400">
                                         #{s.rank}
                                     </td>
                                     <td className="py-3 font-bold text-white flex items-center gap-2">
                                         {s.name}
                                     </td>
-                                    <td className="py-3 text-emerald-400 font-bold">
+                                    <td className="py-3 text-emerald-400 font-black">
                                         {s.score} PTS
                                     </td>
-                                    <td className="py-3 text-gray-300">
+                                    <td className="py-3 text-slate-300">
                                         {s.wave}
                                     </td>
                                     <td className="py-3 text-right">
-                                        <span className="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                        <span className="text-xs px-2.5 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold">
                                             {s.badge}
                                         </span>
                                     </td>
@@ -72,7 +79,7 @@ export default function LeaderboardModal({ isOpen, onClose }) {
                     </table>
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-white/10 text-center text-xs font-mono text-gray-400">
+                <div className="mt-6 pt-4 border-t border-white/10 text-center text-xs text-slate-400 tracking-wider">
                     Saison 1 en cours • Réinitialisation du classement dans 14 jours
                 </div>
             </div>

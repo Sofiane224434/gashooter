@@ -10,6 +10,25 @@ export default function GameMenu() {
     const [gameStarted, setGameStarted] = useState(false);
     const [gameMode, setGameMode] = useState('multiplayer'); // 'multiplayer' | 'training'
 
+    // Fonction universelle pour fermer la page / l'onglet
+    const handleQuitGame = () => {
+        try {
+            window.close();
+        } catch (e) {}
+        try {
+            window.open('', '_self', '');
+            window.close();
+        } catch (e) {}
+        // Fallback si le navigateur empêche window.close()
+        setTimeout(() => {
+            if (!window.closed) {
+                try {
+                    window.location.href = 'about:blank';
+                } catch (e) {}
+            }
+        }, 150);
+    };
+
     const menuItems = [
         {
             id: 'new_game',
@@ -70,11 +89,15 @@ export default function GameMenu() {
                     <line x1="21" y1="12" x2="9" y2="12"/>
                 </svg>
             ),
-            action: () => setActiveModal('quit')
+            action: () => {
+                // Tente de fermer directement et ouvre la modale de confirmation
+                handleQuitGame();
+                setActiveModal('quit');
+            }
         }
     ];
 
-    // Navigation Clavier fluide
+    // Navigation Clavier
     useEffect(() => {
         if (gameStarted) return;
 
@@ -103,12 +126,12 @@ export default function GameMenu() {
     }, [activeModal, selectedIndex, gameStarted]);
 
     if (gameStarted) {
-        return <FirstPersonMap initialMode={gameMode} onExit={() => setGameStarted(false)} />;
+        return <FirstPersonMap initialMode={gameMode} onExit={() => setGameStarted(false)} onQuitPage={handleQuitGame} />;
     }
 
     return (
         <div className="relative min-h-screen w-full bg-[#050811] text-zinc-100 flex flex-col justify-between select-none overflow-hidden font-rajdhani">
-            {/* Arrière-plan spatial cosmique avec nébuleuse, planète à anneaux et station orbitale */}
+            {/* Arrière-plan spatial cosmique */}
             <SpaceBackground />
 
             {/* Haut de page (Header HUD) */}
@@ -124,20 +147,16 @@ export default function GameMenu() {
                     {/* Cadre futuriste avec scanlines et coins néon */}
                     <div className="relative rounded-3xl bg-slate-900/60 backdrop-blur-xl border border-slate-700/60 hud-scanlines p-6 sm:p-10 pt-10 pb-8 shadow-[0_0_50px_rgba(6,182,212,0.12)]">
 
-                        {/* Éléments de structure HUD et crochets d'angle néon */}
-                        {/* Coin Supérieur Gauche */}
+                        {/* Crochets d'angle néon cyan */}
                         <div className="absolute -top-[2px] -left-[2px] w-8 h-8 pointer-events-none">
                             <div className="w-full h-full border-t-2 border-l-2 border-cyan-400 rounded-tl-3xl shadow-[0_0_10px_#22d3ee]"></div>
                         </div>
-                        {/* Coin Supérieur Droit */}
                         <div className="absolute -top-[2px] -right-[2px] w-8 h-8 pointer-events-none">
                             <div className="w-full h-full border-t-2 border-r-2 border-cyan-400 rounded-tr-3xl shadow-[0_0_10px_#22d3ee]"></div>
                         </div>
-                        {/* Coin Inférieur Gauche */}
                         <div className="absolute -bottom-[2px] -left-[2px] w-8 h-8 pointer-events-none">
                             <div className="w-full h-full border-b-2 border-l-2 border-cyan-400 rounded-bl-3xl shadow-[0_0_10px_#22d3ee]"></div>
                         </div>
-                        {/* Coin Inférieur Droit */}
                         <div className="absolute -bottom-[2px] -right-[2px] w-8 h-8 pointer-events-none">
                             <div className="w-full h-full border-b-2 border-r-2 border-cyan-400 rounded-br-3xl shadow-[0_0_10px_#22d3ee]"></div>
                         </div>
@@ -149,9 +168,8 @@ export default function GameMenu() {
                         {/* Barre d'accentuation néon en bas */}
                         <div className="absolute -bottom-[2px] left-1/2 -translate-x-1/2 w-28 sm:w-36 h-[3px] bg-cyan-400 rounded-full shadow-[0_0_12px_#22d3ee]"></div>
 
-                        {/* Titre Principal GASHOOTER avec lueur double Cyan & Magenta */}
+                        {/* Titre Principal GASHOOTER */}
                         <div className="relative text-center mb-6">
-                            {/* Auras d'arrière-plan Cyan (gauche) et Magenta (droite) */}
                             <div className="absolute inset-0 flex justify-center items-center pointer-events-none -z-10">
                                 <div className="w-48 h-16 bg-cyan-500/35 blur-2xl rounded-full -translate-x-20"></div>
                                 <div className="w-48 h-16 bg-fuchsia-500/35 blur-2xl rounded-full translate-x-20"></div>
@@ -166,7 +184,7 @@ export default function GameMenu() {
                                 GASHOOTER
                             </h1>
 
-                            {/* Ligne d'énergie scintillante cyan / jaune / magenta */}
+                            {/* Ligne d'énergie scintillante */}
                             <div className="relative flex justify-center items-center mt-2">
                                 <svg className="w-56 sm:w-72 h-5" viewBox="0 0 280 20" fill="none">
                                     <defs>
@@ -186,18 +204,15 @@ export default function GameMenu() {
                                             </feMerge>
                                         </filter>
                                     </defs>
-                                    {/* Ligne principale éclatante */}
                                     <line x1="25" y1="10" x2="255" y2="10" stroke="url(#neonDividerGrad)" strokeWidth="2.5" filter="url(#neonBlur)" strokeLinecap="round" />
-                                    {/* Traînées énergétiques stylisées */}
                                     <path d="M 50 10 Q 100 4, 140 10 T 230 10" stroke="url(#neonDividerGrad)" strokeWidth="1.2" opacity="0.85" filter="url(#neonBlur)" fill="none" />
                                     <path d="M 60 10 Q 110 16, 140 10 T 220 10" stroke="url(#neonDividerGrad)" strokeWidth="1.2" opacity="0.85" filter="url(#neonBlur)" fill="none" />
-                                    {/* Éclat central */}
                                     <circle cx="140" cy="10" r="2.5" fill="#ffffff" filter="url(#neonBlur)" />
                                 </svg>
                             </div>
                         </div>
 
-                        {/* Boîte intérieure pour les boutons */}
+                        {/* Boîte intérieure pour les 5 boutons */}
                         <div className="w-full max-w-[460px] mx-auto bg-slate-950/50 backdrop-blur-md rounded-2xl border border-white/10 p-5 sm:p-6 shadow-[inset_0_2px_8px_rgba(0,0,0,0.5)]">
                             <div className="flex flex-col space-y-3 sm:space-y-3.5">
                                 {menuItems.map((item, index) => {
@@ -213,12 +228,9 @@ export default function GameMenu() {
                                                     : 'border border-white/10 bg-slate-800/40 hover:bg-slate-800/60 text-slate-300 hover:text-white'
                                             }`}
                                         >
-                                            {/* Icône du bouton */}
                                             <div className={`w-8 flex items-center justify-start transition-colors ${isSelected ? 'text-cyan-300 drop-shadow-[0_0_8px_rgba(6,182,212,0.8)]' : 'text-slate-400'}`}>
                                                 {item.icon}
                                             </div>
-
-                                            {/* Texte centré */}
                                             <div className="flex-1 text-center pr-8">
                                                 {item.label}
                                             </div>
@@ -236,12 +248,12 @@ export default function GameMenu() {
                 </div>
             </main>
 
-            {/* Bas de page (Footer Copyright) */}
+            {/* Bas de page (Footer) */}
             <footer className="relative z-10 w-full px-8 py-5 text-center text-xs sm:text-sm text-slate-400/70 tracking-widest uppercase">
                 © {new Date().getFullYear()} Sofiane Kherarfa - Tous droits réservés
             </footer>
 
-            {/* Modals */}
+            {/* Modals thématiques HUD */}
             <SettingsModal
                 isOpen={activeModal === 'settings'}
                 onClose={() => setActiveModal(null)}
@@ -254,23 +266,26 @@ export default function GameMenu() {
 
             {/* Modal Sélection de Mode de Jeu */}
             {activeModal === 'newgame' && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-                    <div className="relative w-full max-w-lg bg-slate-950/90 border border-cyan-500/40 rounded-2xl p-7 text-zinc-100 shadow-[0_0_40px_rgba(6,182,212,0.2)]">
-                        {/* Coin d'angle HUD */}
-                        <div className="absolute -top-[2px] -left-[2px] w-6 h-6 border-t-2 border-l-2 border-cyan-400 rounded-tl-xl"></div>
-                        <div className="absolute -top-[2px] -right-[2px] w-6 h-6 border-t-2 border-r-2 border-cyan-400 rounded-tr-xl"></div>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn font-rajdhani">
+                    <div className="relative w-full max-w-lg rounded-3xl bg-slate-900/90 backdrop-blur-xl border border-slate-700/80 hud-scanlines p-6 sm:p-8 text-zinc-100 shadow-[0_0_50px_rgba(6,182,212,0.2)]">
+                        {/* Crochets d'angle HUD */}
+                        <div className="absolute -top-[2px] -left-[2px] w-7 h-7 border-t-2 border-l-2 border-cyan-400 rounded-tl-3xl shadow-[0_0_10px_#22d3ee] pointer-events-none"></div>
+                        <div className="absolute -top-[2px] -right-[2px] w-7 h-7 border-t-2 border-r-2 border-cyan-400 rounded-tr-3xl shadow-[0_0_10px_#22d3ee] pointer-events-none"></div>
+                        <div className="absolute -bottom-[2px] -left-[2px] w-7 h-7 border-b-2 border-l-2 border-cyan-400 rounded-bl-3xl shadow-[0_0_10px_#22d3ee] pointer-events-none"></div>
+                        <div className="absolute -bottom-[2px] -right-[2px] w-7 h-7 border-b-2 border-r-2 border-cyan-400 rounded-br-3xl shadow-[0_0_10px_#22d3ee] pointer-events-none"></div>
+                        <div className="absolute -bottom-[2px] left-1/2 -translate-x-1/2 w-28 h-[3px] bg-cyan-400 rounded-full shadow-[0_0_12px_#22d3ee]"></div>
 
                         <div className="text-center mb-6">
                             <span className="text-3xl inline-block mb-2">🎯</span>
-                            <h3 className="font-orbitron text-2xl font-bold uppercase tracking-wider text-cyan-300">
+                            <h3 className="font-orbitron text-2xl font-black uppercase tracking-wider text-cyan-300">
                                 Sélection du Mode de Jeu
                             </h3>
                             <p className="text-sm text-slate-400 mt-1">
-                                Choisissez votre expérience de combat spatial
+                                Choisissez votre expérience de combat tactique
                             </p>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-4 mb-6 font-rajdhani">
+                        <div className="grid grid-cols-1 gap-4 mb-6">
                             {/* Mode Multijoueur Arène 4 Joueurs */}
                             <button
                                 onClick={() => {
@@ -278,14 +293,14 @@ export default function GameMenu() {
                                     setActiveModal(null);
                                     setGameStarted(true);
                                 }}
-                                className="group p-5 bg-gradient-to-r from-cyan-950/80 via-slate-900 to-slate-900/90 border border-cyan-500/40 hover:border-cyan-300 rounded-xl text-left transition-all hover:scale-[1.02] shadow-lg cursor-pointer hover:shadow-[0_0_20px_rgba(6,182,212,0.3)]"
+                                className="group p-5 bg-gradient-to-r from-cyan-950/80 via-cyan-900/40 to-slate-900/90 border-2 border-cyan-400/80 hover:border-cyan-300 rounded-2xl text-left transition-all hover:scale-[1.02] shadow-[0_0_20px_rgba(6,182,212,0.3)] cursor-pointer"
                             >
                                 <div className="flex items-center justify-between mb-2">
                                     <div className="font-bold text-cyan-300 text-xl flex items-center space-x-2">
                                         <span>⚔️</span>
                                         <span>Arène Multijoueur (4 Joueurs)</span>
                                     </div>
-                                    <span className="px-2.5 py-0.5 bg-cyan-500/20 text-cyan-300 text-xs font-bold uppercase rounded-full border border-cyan-500/40">
+                                    <span className="px-2.5 py-0.5 bg-cyan-500/20 text-cyan-300 text-xs font-bold uppercase rounded-full border border-cyan-500/50">
                                         Recommandé
                                     </span>
                                 </div>
@@ -301,7 +316,7 @@ export default function GameMenu() {
                                     setActiveModal(null);
                                     setGameStarted(true);
                                 }}
-                                className="group p-4 bg-slate-900/60 border border-slate-700 hover:border-cyan-500/50 rounded-xl text-left transition-all hover:scale-[1.01] cursor-pointer"
+                                className="group p-4 bg-slate-900/60 border border-slate-700 hover:border-cyan-500/60 rounded-2xl text-left transition-all hover:scale-[1.01] cursor-pointer"
                             >
                                 <div className="font-bold text-slate-200 text-lg flex items-center space-x-2 mb-1">
                                     <span>🎯</span>
@@ -316,7 +331,7 @@ export default function GameMenu() {
                         <div className="flex justify-end">
                             <button
                                 onClick={() => setActiveModal(null)}
-                                className="px-6 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg text-sm font-semibold uppercase tracking-wider transition cursor-pointer"
+                                className="px-6 py-2.5 bg-slate-800/80 hover:bg-slate-700 border border-slate-600 rounded-xl text-sm font-bold uppercase tracking-wider transition cursor-pointer"
                             >
                                 Retour
                             </button>
@@ -327,8 +342,15 @@ export default function GameMenu() {
 
             {/* Modal Continuer */}
             {activeModal === 'continue' && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-                    <div className="relative w-full max-w-sm bg-slate-950/90 border border-cyan-500/40 rounded-xl p-6 text-center text-zinc-100 shadow-[0_0_30px_rgba(6,182,212,0.2)]">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn font-rajdhani">
+                    <div className="relative w-full max-w-sm rounded-3xl bg-slate-900/90 backdrop-blur-xl border border-slate-700/80 hud-scanlines p-6 sm:p-8 text-center text-zinc-100 shadow-[0_0_50px_rgba(6,182,212,0.2)]">
+                        {/* Crochets d'angle HUD */}
+                        <div className="absolute -top-[2px] -left-[2px] w-6 h-6 border-t-2 border-l-2 border-cyan-400 rounded-tl-2xl shadow-[0_0_10px_#22d3ee] pointer-events-none"></div>
+                        <div className="absolute -top-[2px] -right-[2px] w-6 h-6 border-t-2 border-r-2 border-cyan-400 rounded-tr-2xl shadow-[0_0_10px_#22d3ee] pointer-events-none"></div>
+                        <div className="absolute -bottom-[2px] -left-[2px] w-6 h-6 border-b-2 border-l-2 border-cyan-400 rounded-bl-2xl shadow-[0_0_10px_#22d3ee] pointer-events-none"></div>
+                        <div className="absolute -bottom-[2px] -right-[2px] w-6 h-6 border-b-2 border-r-2 border-cyan-400 rounded-br-2xl shadow-[0_0_10px_#22d3ee] pointer-events-none"></div>
+                        <div className="absolute -bottom-[2px] left-1/2 -translate-x-1/2 w-20 h-[3px] bg-cyan-400 rounded-full shadow-[0_0_12px_#22d3ee]"></div>
+
                         <h3 className="font-orbitron text-xl font-bold uppercase tracking-wide text-cyan-300 mb-3">Continuer</h3>
                         <p className="text-sm text-slate-300 mb-6 font-sans">
                             Reprendre votre dernière session sauvegardée ?
@@ -336,7 +358,7 @@ export default function GameMenu() {
                         <div className="flex gap-3 justify-center">
                             <button
                                 onClick={() => setActiveModal(null)}
-                                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-semibold transition"
+                                className="px-5 py-2.5 bg-slate-800/80 hover:bg-slate-700 border border-slate-600 rounded-xl text-sm font-bold uppercase tracking-wider transition cursor-pointer"
                             >
                                 Annuler
                             </button>
@@ -346,7 +368,7 @@ export default function GameMenu() {
                                     setActiveModal(null);
                                     setGameStarted(true);
                                 }}
-                                className="px-5 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-lg text-sm transition shadow-[0_0_15px_rgba(6,182,212,0.5)]"
+                                className="px-6 py-2.5 border-2 border-cyan-400 bg-gradient-to-r from-cyan-950/90 via-cyan-900/60 to-slate-900 text-white font-bold rounded-xl text-sm uppercase tracking-wider transition btn-glow-cyan cursor-pointer"
                             >
                                 Reprendre
                             </button>
@@ -355,20 +377,42 @@ export default function GameMenu() {
                 </div>
             )}
 
-            {/* Modal Quitter */}
+            {/* Modal Quitter (Ferme la page) */}
             {activeModal === 'quit' && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-                    <div className="relative w-full max-w-sm bg-slate-950/90 border border-cyan-500/40 rounded-xl p-6 text-center text-zinc-100 shadow-[0_0_30px_rgba(6,182,212,0.2)]">
-                        <h3 className="font-orbitron text-xl font-bold uppercase tracking-wide text-cyan-300 mb-3">Quitter</h3>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn font-rajdhani">
+                    <div className="relative w-full max-w-sm rounded-3xl bg-slate-900/90 backdrop-blur-xl border border-slate-700/80 hud-scanlines p-6 sm:p-8 text-center text-zinc-100 shadow-[0_0_50px_rgba(239,68,68,0.25)]">
+                        {/* Crochets d'angle HUD rouge/cyan */}
+                        <div className="absolute -top-[2px] -left-[2px] w-6 h-6 border-t-2 border-l-2 border-red-400 rounded-tl-2xl shadow-[0_0_10px_#f87171] pointer-events-none"></div>
+                        <div className="absolute -top-[2px] -right-[2px] w-6 h-6 border-t-2 border-r-2 border-red-400 rounded-tr-2xl shadow-[0_0_10px_#f87171] pointer-events-none"></div>
+                        <div className="absolute -bottom-[2px] -left-[2px] w-6 h-6 border-b-2 border-l-2 border-red-400 rounded-bl-2xl shadow-[0_0_10px_#f87171] pointer-events-none"></div>
+                        <div className="absolute -bottom-[2px] -right-[2px] w-6 h-6 border-b-2 border-r-2 border-red-400 rounded-br-2xl shadow-[0_0_10px_#f87171] pointer-events-none"></div>
+                        <div className="absolute -bottom-[2px] left-1/2 -translate-x-1/2 w-20 h-[3px] bg-red-400 rounded-full shadow-[0_0_12px_#f87171]"></div>
+
+                        <div className="w-12 h-12 rounded-full bg-red-500/20 border border-red-500/40 text-red-400 flex items-center justify-center mx-auto mb-3 text-2xl">
+                            🚪
+                        </div>
+
+                        <h3 className="font-orbitron text-xl font-bold uppercase tracking-wide text-red-400 mb-2">
+                            Quitter le Jeu
+                        </h3>
                         <p className="text-sm text-slate-300 mb-6 font-sans">
-                            Vous pouvez fermer cet onglet pour quitter le jeu.
+                            Fermeture de la session et de la fenêtre en cours.
                         </p>
-                        <button
-                            onClick={() => setActiveModal(null)}
-                            className="px-6 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 rounded-lg text-sm font-semibold uppercase tracking-wider text-cyan-300 transition"
-                        >
-                            Fermer
-                        </button>
+
+                        <div className="flex flex-col gap-2.5">
+                            <button
+                                onClick={handleQuitGame}
+                                className="w-full py-3 border-2 border-red-500 bg-gradient-to-r from-red-950/90 via-red-900/60 to-slate-900 text-white font-bold rounded-xl text-sm uppercase tracking-wider transition shadow-[0_0_20px_rgba(239,68,68,0.5)] hover:scale-[1.02] cursor-pointer"
+                            >
+                                ✕ Fermer la Page Maintenant
+                            </button>
+                            <button
+                                onClick={() => setActiveModal(null)}
+                                className="w-full py-2 bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl text-xs uppercase tracking-wider transition cursor-pointer"
+                            >
+                                Annuler
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

@@ -10,12 +10,16 @@ import { sound } from '../../services/sound.js';
 import { SaveService } from '../../services/saveService.js';
 import { MultiplayerClient } from '../../services/multiplayerClient.js';
 
-export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) {
+export default function FirstPersonMap({ onExit, onQuitPage, initialMode = 'multiplayer' }) {
     const canvasRef = useRef(null);
     const onExitRef = useRef(onExit);
     onExitRef.current = onExit;
+    const onQuitPageRef = useRef(onQuitPage);
+    onQuitPageRef.current = onQuitPage;
 
     const [isLocked, setIsLocked] = useState(false);
+    const [isAltHeld, setIsAltHeld] = useState(false);
+    const isAltHeldRef = useRef(false);
     const [isAiming, setIsAiming] = useState(false);
     const [activeWeaponSlot, setActiveWeaponSlot] = useState(1); // 1 = AR-47, 2 = AWP-50 Sniper
     const [autoSprint, setAutoSprint] = useState(() => {
@@ -1433,6 +1437,17 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
         const onKeyDown = (e) => {
             if (isDead) return;
 
+            // Maintien de ALT : libère le curseur pour interagir
+            if (e.code === 'AltLeft' || e.code === 'AltRight' || e.key === 'Alt') {
+                e.preventDefault();
+                isAltHeldRef.current = true;
+                setIsAltHeld(true);
+                if (document.pointerLockElement) {
+                    document.exitPointerLock();
+                }
+                return;
+            }
+
             if (e.code === 'Digit1' || e.code === 'Numpad1') {
                 switchWeapon(1);
                 return;
@@ -1491,6 +1506,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                             const hits = ray.intersectObjects(colliderMeshes, false);
                             if (hits.length > 0 && hits[0].face) {
                                 wallNormal.copy(hits[0].face.normal).normalize();
+                                wallNormal.normalize();
                                 foundWall = true;
                                 break;
                             }
@@ -1513,6 +1529,19 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
         };
 
         const onKeyUp = (e) => {
+            // Relâchement de ALT : verrouille à nouveau le curseur dans le jeu
+            if (e.code === 'AltLeft' || e.code === 'AltRight' || e.key === 'Alt') {
+                e.preventDefault();
+                isAltHeldRef.current = false;
+                setIsAltHeld(false);
+                if (!isDead && canvas) {
+                    try {
+                        canvas.requestPointerLock();
+                    } catch (err) {}
+                }
+                return;
+            }
+
             switch (e.code) {
                 case 'KeyW': case 'KeyZ': case 'ArrowUp': moveState.forward = false; break;
                 case 'KeyS': case 'ArrowDown': moveState.backward = false; break;
@@ -1528,6 +1557,11 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             }
         };
 
+        const onBlur = () => {
+            isAltHeldRef.current = false;
+            setIsAltHeld(false);
+        };
+
         const onWheel = (e) => {
             if (e.deltaY > 0) switchWeapon(2);
             else if (e.deltaY < 0) switchWeapon(1);
@@ -1535,10 +1569,11 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
 
         window.addEventListener('keydown', onKeyDown);
         window.addEventListener('keyup', onKeyUp);
+        window.addEventListener('blur', onBlur);
         window.addEventListener('wheel', onWheel);
 
         const fireWeapon = () => {
-            if (!controls.isLocked || reloading || isDead) return;
+            if (!controls.isLocked || reloading || isDead || isAltHeldRef.current) return;
 
             const now = performance.now();
             const curW = currentWeaponsAmmo[currentWeaponSlot];
@@ -1584,7 +1619,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
 
         let isMouseDown = false;
         const onMouseDown = (e) => {
-            if (!controls.isLocked || isDead) return;
+            if (!controls.isLocked || isDead || isAltHeldRef.current) return;
             if (e.button === 0) {
                 isMouseDown = true;
                 fireWeapon();
@@ -2011,6 +2046,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
             window.removeEventListener('resize', handleResize);
             window.removeEventListener('keydown', onKeyDown);
             window.removeEventListener('keyup', onKeyUp);
+            window.removeEventListener('blur', onBlur);
             window.removeEventListener('wheel', onWheel);
             window.removeEventListener('mousedown', onMouseDown);
             window.removeEventListener('mouseup', onMouseUp);
@@ -2027,7 +2063,7 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
     const currentWeapon = weaponsAmmo[activeWeaponSlot];
 
     return (
-        <div className="relative w-screen h-screen overflow-hidden bg-slate-950 select-none font-sans">
+        <div className="relative w-screen h-screen overflow-hidden bg-slate-950 select-none font-rajdhani">
             {/* Flash rouge de dégât reçu */}
             {damageFlash && (
                 <div className="pointer-events-none absolute inset-0 bg-red-600/40 z-40 animate-pulse"></div>
@@ -2066,35 +2102,54 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 </div>
             )}
 
+            {/* Indicateur de curseur libre quand ALT est maintenu */}
+            {isAltHeld && (
+                <div className="pointer-events-none absolute top-7 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 bg-slate-900/90 border border-amber-400/80 px-5 py-2 rounded-full shadow-[0_0_25px_rgba(245,158,11,0.4)] text-amber-300 text-xs sm:text-sm font-bold uppercase tracking-widest font-rajdhani animate-pulse">
+                    <span>🖱️</span>
+                    <span>CURSEUR LIBRE [ALT] • Relâchez pour verrouiller la visée</span>
+                </div>
+            )}
+
             {/* Canvas 3D */}
             <canvas
                 ref={canvasRef}
-                className="w-full h-full block cursor-crosshair"
+                className={`w-full h-full block ${isAltHeld ? 'cursor-default' : 'cursor-crosshair'}`}
                 onClick={() => {
                     const canvas = canvasRef.current;
-                    if (canvas && !isLocked && !isDead) canvas.requestPointerLock();
+                    if (canvas && !isLocked && !isDead) {
+                        isAltHeldRef.current = false;
+                        setIsAltHeld(false);
+                        canvas.requestPointerLock();
+                    }
                 }}
             />
 
-            {/* ÉCRAN DE MORT */}
+            {/* ÉCRAN DE MORT SCI-FI HUD */}
             {isDead && (
-                <div className="absolute inset-0 bg-red-950/80 backdrop-blur-md flex flex-col items-center justify-center z-50 animate-fadeIn">
-                    <div className="bg-slate-900/95 border-2 border-red-500/80 p-8 rounded-2xl max-w-md w-full text-center shadow-[0_0_50px_rgba(239,68,68,0.5)] space-y-6">
-                        <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-red-500/20 border border-red-500/40 text-red-400 text-4xl animate-bounce">
+                <div className="absolute inset-0 bg-red-950/80 backdrop-blur-md flex flex-col items-center justify-center z-50 animate-fadeIn font-rajdhani">
+                    <div className="relative rounded-3xl bg-slate-900/95 backdrop-blur-xl border border-red-500/70 hud-scanlines p-8 sm:p-10 max-w-md w-full text-center shadow-[0_0_60px_rgba(239,68,68,0.4)] space-y-6">
+                        {/* Crochets d'angle HUD rouges */}
+                        <div className="absolute -top-[2px] -left-[2px] w-7 h-7 border-t-2 border-l-2 border-red-400 rounded-tl-3xl shadow-[0_0_10px_#f87171] pointer-events-none"></div>
+                        <div className="absolute -top-[2px] -right-[2px] w-7 h-7 border-t-2 border-r-2 border-red-400 rounded-tr-3xl shadow-[0_0_10px_#f87171] pointer-events-none"></div>
+                        <div className="absolute -bottom-[2px] -left-[2px] w-7 h-7 border-b-2 border-l-2 border-red-400 rounded-bl-3xl shadow-[0_0_10px_#f87171] pointer-events-none"></div>
+                        <div className="absolute -bottom-[2px] -right-[2px] w-7 h-7 border-b-2 border-r-2 border-red-400 rounded-br-3xl shadow-[0_0_10px_#f87171] pointer-events-none"></div>
+                        <div className="absolute -bottom-[2px] left-1/2 -translate-x-1/2 w-28 h-[3px] bg-red-400 rounded-full shadow-[0_0_12px_#f87171]"></div>
+
+                        <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-red-500/20 border border-red-500/40 text-red-400 text-4xl animate-bounce">
                             💀
                         </div>
                         <div>
-                            <h2 className="text-3xl font-black text-red-500 uppercase tracking-widest">
+                            <h2 className="font-orbitron text-3xl font-black text-red-500 uppercase tracking-widest">
                                 ÉLIMINÉ !
                             </h2>
-                            <p className="text-sm text-slate-300 mt-2">
+                            <p className="text-sm text-slate-300 mt-2 font-sans">
                                 Éliminé par <span className="text-cyan-400 font-bold">{lastKiller}</span>
                             </p>
                         </div>
 
-                        <div className="py-4 bg-slate-800/80 rounded-xl border border-slate-700">
+                        <div className="py-4 bg-slate-950/60 rounded-2xl border border-slate-800">
                             <div className="text-xs uppercase tracking-widest text-slate-400 font-bold">Réapparition dans</div>
-                            <div className="text-5xl font-black text-white mt-1 animate-pulse">
+                            <div className="font-orbitron text-5xl font-black text-white mt-1 animate-pulse">
                                 {respawnTimer}s
                             </div>
                         </div>
@@ -2277,62 +2332,81 @@ export default function FirstPersonMap({ onExit, initialMode = 'multiplayer' }) 
                 )}
             </div>
 
-            {/* Menu Pause */}
-            {!isLocked && !isDead && (
-                <div className="absolute inset-0 bg-black/65 backdrop-blur-sm flex flex-col items-center justify-center z-50">
-                    <div className="bg-slate-900/95 border border-slate-700 p-8 rounded-2xl max-w-lg w-full text-center shadow-2xl space-y-6">
-                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-3xl font-bold">
+            {/* Menu Pause Sci-Fi HUD */}
+            {!isLocked && !isDead && !isAltHeld && (
+                <div className="absolute inset-0 bg-black/75 backdrop-blur-md flex flex-col items-center justify-center z-50 font-rajdhani animate-fadeIn">
+                    <div className="relative rounded-3xl bg-slate-900/90 backdrop-blur-xl border border-slate-700/80 hud-scanlines p-8 sm:p-10 max-w-lg w-full text-center shadow-[0_0_50px_rgba(6,182,212,0.2)] space-y-6">
+                        {/* Crochets d'angle HUD */}
+                        <div className="absolute -top-[2px] -left-[2px] w-7 h-7 border-t-2 border-l-2 border-cyan-400 rounded-tl-3xl shadow-[0_0_10px_#22d3ee] pointer-events-none"></div>
+                        <div className="absolute -top-[2px] -right-[2px] w-7 h-7 border-t-2 border-r-2 border-cyan-400 rounded-tr-3xl shadow-[0_0_10px_#22d3ee] pointer-events-none"></div>
+                        <div className="absolute -bottom-[2px] -left-[2px] w-7 h-7 border-b-2 border-l-2 border-cyan-400 rounded-bl-3xl shadow-[0_0_10px_#22d3ee] pointer-events-none"></div>
+                        <div className="absolute -bottom-[2px] -right-[2px] w-7 h-7 border-b-2 border-r-2 border-cyan-400 rounded-br-3xl shadow-[0_0_10px_#22d3ee] pointer-events-none"></div>
+                        <div className="absolute -bottom-[2px] left-1/2 -translate-x-1/2 w-32 h-[3px] bg-cyan-400 rounded-full shadow-[0_0_12px_#22d3ee]"></div>
+
+                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-cyan-500/15 border border-cyan-500/40 text-cyan-400 text-3xl font-bold shadow-[0_0_15px_rgba(6,182,212,0.3)]">
                             ⚔️
                         </div>
                         <div>
-                            <h2 className="text-2xl font-black text-white tracking-wide uppercase">
-                                Opération Métro (280x200m)
+                            <h2 className="font-orbitron text-2xl sm:text-3xl font-black text-white tracking-wide uppercase">
+                                Opération Métro
                             </h2>
-                            <p className="text-xs text-slate-400 mt-2">
+                            <p className="text-xs text-slate-400 mt-2 font-sans">
                                 {networkStatus} • Parc Extérieur → Tunnel Métro → Rue Urbaine
                             </p>
                         </div>
 
-                        <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/80 flex items-center justify-between">
+                        <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between">
                             <span className="text-xs font-bold text-slate-200">Course Automatique (Auto-Sprint)</span>
                             <button
                                 onClick={toggleAutoSprint}
-                                className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                                className={`px-4 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                                     autoSprint
                                         ? 'bg-amber-500 text-zinc-950 shadow-[0_0_12px_rgba(245,158,11,0.6)]'
-                                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                                 }`}
                             >
                                 {autoSprint ? 'ACTIVÉE (ON)' : 'DÉSACTIVÉE (OFF)'}
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2 text-left text-xs bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/80 text-slate-300">
+                        <div className="grid grid-cols-2 gap-2 text-left text-xs bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800 text-slate-300">
                             <div><span className="font-bold text-cyan-400">[1 / 2 / Molette]</span> : Armes</div>
                             <div><span className="font-bold text-cyan-400">[Z,Q,S,D]</span> : Déplacement</div>
                             <div><span className="font-bold text-cyan-400">[ESPACE]</span> : Saut / <span className="text-amber-400 font-bold">Wall Jump</span></div>
+                            <div><span className="font-bold text-amber-400">[Maintien ALT]</span> : <span className="text-amber-300 font-bold">Curseur libre</span></div>
                             <div><span className="font-bold text-cyan-400">[C / CTRL]</span> : Accroupi</div>
                             <div><span className="font-bold text-amber-400">[Sprint + C]</span> : <span className="text-amber-400 font-bold">Glissade</span></div>
                             <div><span className="font-bold text-cyan-400">[R]</span> : Recharger</div>
-                            <div><span className="font-bold text-cyan-400">[CLIC DROIT]</span> : Viser</div>
-                            <div><span className="font-bold text-cyan-400">[CLIC GAUCHE]</span> : Tirer</div>
+                            <div><span className="font-bold text-cyan-400">[CLIC DROIT / GAUCHE]</span> : Viser / Tirer</div>
                         </div>
 
-                        <div className="space-y-3">
+                        <div className="space-y-3 pt-2">
                             <button
                                 onClick={() => {
                                     const canvas = canvasRef.current;
                                     if (canvas) canvas.requestPointerLock();
                                 }}
-                                className="w-full py-3.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl text-sm uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(6,182,212,0.4)] cursor-pointer"
+                                className="w-full py-3.5 border-2 border-cyan-400 bg-gradient-to-r from-cyan-950/90 via-cyan-900/60 to-slate-900 text-white font-bold rounded-xl text-sm uppercase tracking-wider transition-all btn-glow-cyan cursor-pointer"
                             >
                                 Déployer dans la Partie
                             </button>
                             <button
                                 onClick={() => onExitRef.current()}
-                                className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs uppercase tracking-wider transition-colors cursor-pointer"
+                                className="w-full py-2.5 bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-slate-300 hover:text-white rounded-xl text-xs uppercase tracking-wider transition-colors cursor-pointer font-bold"
                             >
                                 Retour au Menu Principal
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (onQuitPageRef.current) {
+                                        onQuitPageRef.current();
+                                    } else {
+                                        window.close();
+                                    }
+                                }}
+                                className="w-full py-2.5 bg-red-950/50 hover:bg-red-900/60 border border-red-500/50 text-red-300 hover:text-red-200 rounded-xl text-xs uppercase tracking-wider transition-colors cursor-pointer font-bold"
+                            >
+                                🚪 Quitter le Jeu (Fermer la Page)
                             </button>
                         </div>
                     </div>

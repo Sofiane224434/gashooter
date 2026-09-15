@@ -11,7 +11,7 @@ export default function ModesModal({ isOpen, onClose, onSelectMode }) {
             difficulty: 'Normal',
             reward: '+1000 XP',
             badge: 'HISTOIRE',
-            color: 'from-emerald-500/20 to-green-600/30 border-emerald-500/50 hover:border-emerald-400'
+            color: 'from-cyan-950/70 via-slate-900 to-slate-950 border-cyan-500/40 hover:border-cyan-400'
         },
         {
             id: 'survival',
@@ -20,7 +20,7 @@ export default function ModesModal({ isOpen, onClose, onSelectMode }) {
             difficulty: 'Difficile',
             reward: 'Multiplicateur x2',
             badge: 'ARCADE',
-            color: 'from-cyan-500/20 to-blue-600/30 border-cyan-500/50 hover:border-cyan-400'
+            color: 'from-blue-950/70 via-slate-900 to-slate-950 border-blue-500/40 hover:border-blue-400'
         },
         {
             id: 'boss_rush',
@@ -29,7 +29,7 @@ export default function ModesModal({ isOpen, onClose, onSelectMode }) {
             difficulty: 'Extrême',
             reward: 'Vaisseau Légendaire',
             badge: 'DÉFI',
-            color: 'from-purple-500/20 to-pink-600/30 border-purple-500/50 hover:border-purple-400'
+            color: 'from-fuchsia-950/70 via-slate-900 to-slate-950 border-fuchsia-500/40 hover:border-fuchsia-400'
         },
         {
             id: 'pvp',
@@ -38,19 +38,26 @@ export default function ModesModal({ isOpen, onClose, onSelectMode }) {
             difficulty: 'Compétitif',
             reward: 'Rang Galactique',
             badge: 'BÊTA',
-            color: 'from-amber-500/20 to-orange-600/30 border-amber-500/50 hover:border-amber-400'
+            color: 'from-amber-950/70 via-slate-900 to-slate-950 border-amber-500/40 hover:border-amber-400'
         }
     ];
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-            <div className="relative w-full max-w-4xl bg-slate-950/90 border-2 border-emerald-500/60 rounded-2xl p-6 sm:p-8 shadow-[0_0_50px_rgba(16,185,129,0.3)] text-white overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn font-rajdhani">
+            <div className="relative w-full max-w-4xl rounded-3xl bg-slate-900/90 backdrop-blur-xl border border-slate-700/80 hud-scanlines p-6 sm:p-8 shadow-[0_0_50px_rgba(6,182,212,0.2)] text-white overflow-hidden">
+                {/* Crochets d'angle HUD */}
+                <div className="absolute -top-[2px] -left-[2px] w-7 h-7 border-t-2 border-l-2 border-cyan-400 rounded-tl-3xl shadow-[0_0_10px_#22d3ee] pointer-events-none"></div>
+                <div className="absolute -top-[2px] -right-[2px] w-7 h-7 border-t-2 border-r-2 border-cyan-400 rounded-tr-3xl shadow-[0_0_10px_#22d3ee] pointer-events-none"></div>
+                <div className="absolute -bottom-[2px] -left-[2px] w-7 h-7 border-b-2 border-l-2 border-cyan-400 rounded-bl-3xl shadow-[0_0_10px_#22d3ee] pointer-events-none"></div>
+                <div className="absolute -bottom-[2px] -right-[2px] w-7 h-7 border-b-2 border-r-2 border-cyan-400 rounded-br-3xl shadow-[0_0_10px_#22d3ee] pointer-events-none"></div>
+                <div className="absolute -bottom-[2px] left-1/2 -translate-x-1/2 w-32 h-[3px] bg-cyan-400 rounded-full shadow-[0_0_12px_#22d3ee]"></div>
+
                 {/* Header */}
-                <div className="flex items-center justify-between border-b border-emerald-500/30 pb-4 mb-6">
+                <div className="flex items-center justify-between border-b border-cyan-500/30 pb-4 mb-6">
                     <div className="flex items-center gap-3">
-                        <span className="w-3 h-3 rounded-full bg-emerald-400 animate-ping"></span>
-                        <h2 className="text-2xl sm:text-3xl font-black tracking-wider text-emerald-400 font-mono">
-                            // SÉLECTION DU MODE
+                        <span className="w-3 h-3 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_#22d3ee]"></span>
+                        <h2 className="text-2xl sm:text-3xl font-black tracking-wider text-cyan-300 font-orbitron uppercase">
+                            Sélection du Mode
                         </h2>
                     </div>
                     <button
@@ -59,9 +66,9 @@ export default function ModesModal({ isOpen, onClose, onSelectMode }) {
                             onClose();
                         }}
                         onMouseEnter={() => sound.playHover()}
-                        className="px-3 py-1 bg-red-500/20 hover:bg-red-500/40 text-red-400 border border-red-500/50 rounded-lg text-sm font-mono transition-all cursor-pointer"
+                        className="px-4 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-600 rounded-xl text-xs font-bold tracking-wider transition-all cursor-pointer"
                     >
-                        FERMER [ESC]
+                        FERMER [ÉCHAP]
                     </button>
                 </div>
 
@@ -75,30 +82,30 @@ export default function ModesModal({ isOpen, onClose, onSelectMode }) {
                                 sound.playLaunch();
                                 onSelectMode(mode.id);
                             }}
-                            className={`group relative p-5 rounded-xl border bg-gradient-to-br ${mode.color} transition-all duration-300 hover:scale-[1.02] cursor-pointer hover:shadow-[0_0_25px_rgba(57,255,20,0.25)] flex flex-col justify-between`}
+                            className={`group relative p-5 rounded-2xl border bg-gradient-to-br ${mode.color} transition-all duration-200 hover:scale-[1.02] cursor-pointer hover:shadow-[0_0_25px_rgba(6,182,212,0.3)] flex flex-col justify-between`}
                         >
                             <div>
                                 <div className="flex items-center justify-between mb-2">
-                                    <span className="text-xs font-mono px-2 py-0.5 rounded bg-emerald-500/30 text-emerald-300 border border-emerald-400/40">
+                                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 font-bold uppercase tracking-wider">
                                         {mode.badge}
                                     </span>
-                                    <span className="text-xs font-mono text-gray-400">
+                                    <span className="text-xs text-slate-400">
                                         Difficulté: <span className="text-white font-bold">{mode.difficulty}</span>
                                     </span>
                                 </div>
-                                <h3 className="text-xl font-bold font-mono tracking-wide text-white group-hover:text-emerald-300 transition-colors">
+                                <h3 className="text-xl font-bold font-orbitron tracking-wide text-white group-hover:text-cyan-300 transition-colors">
                                     {mode.name}
                                 </h3>
-                                <p className="text-sm text-gray-300 mt-2 line-clamp-2">
+                                <p className="text-sm text-slate-300 mt-2 font-sans line-clamp-2">
                                     {mode.desc}
                                 </p>
                             </div>
 
                             <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between">
-                                <span className="text-xs font-mono text-emerald-400">
+                                <span className="text-xs font-bold text-cyan-400 tracking-wider">
                                     Récompense : {mode.reward}
                                 </span>
-                                <span className="text-sm font-mono text-emerald-300 font-bold group-hover:translate-x-1 transition-transform">
+                                <span className="text-sm text-cyan-300 font-bold group-hover:translate-x-1 transition-transform tracking-wider">
                                     DÉPLOYER →
                                 </span>
                             </div>
