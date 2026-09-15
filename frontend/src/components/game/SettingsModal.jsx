@@ -12,64 +12,70 @@ export default function SettingsModal({ isOpen, onClose }) {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
-            <div className="w-full max-w-lg bg-zinc-900 border border-zinc-700 rounded-xl p-6 sm:p-8 text-zinc-100 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn font-rajdhani">
+            <div className="relative w-full max-w-lg bg-slate-950/95 border border-cyan-500/40 rounded-2xl p-6 sm:p-8 text-zinc-100 shadow-[0_0_40px_rgba(6,182,212,0.2)]">
+                {/* Crochets d'angle HUD */}
+                <div className="absolute -top-[2px] -left-[2px] w-6 h-6 border-t-2 border-l-2 border-cyan-400 rounded-tl-xl"></div>
+                <div className="absolute -top-[2px] -right-[2px] w-6 h-6 border-t-2 border-r-2 border-cyan-400 rounded-tr-xl"></div>
+                <div className="absolute -bottom-[2px] -left-[2px] w-6 h-6 border-b-2 border-l-2 border-cyan-400 rounded-bl-xl"></div>
+                <div className="absolute -bottom-[2px] -right-[2px] w-6 h-6 border-b-2 border-r-2 border-cyan-400 rounded-br-xl"></div>
+
                 {/* En-tête */}
-                <div className="flex items-center justify-between border-b border-zinc-800 pb-4 mb-6">
-                    <h2 className="text-xl sm:text-2xl font-bold tracking-wide uppercase">
+                <div className="flex items-center justify-between border-b border-cyan-500/20 pb-4 mb-6">
+                    <h2 className="font-orbitron text-xl sm:text-2xl font-bold tracking-wider uppercase text-cyan-300">
                         Options
                     </h2>
                     <button
                         onClick={onClose}
-                        className="text-zinc-400 hover:text-white text-sm font-semibold px-2 py-1 rounded transition"
+                        className="text-slate-400 hover:text-cyan-300 text-sm font-semibold px-3 py-1 rounded transition border border-transparent hover:border-cyan-500/30 cursor-pointer"
                     >
                         ✕ Fermer
                     </button>
                 </div>
 
                 {/* Contenu */}
-                <div className="space-y-5 text-sm">
-                    <div className="flex items-center justify-between py-2 border-b border-zinc-800/60">
+                <div className="space-y-5 text-base">
+                    <div className="flex items-center justify-between py-2 border-b border-slate-800/80">
                         <div>
-                            <div className="font-semibold text-zinc-200">Mode Plein Écran</div>
-                            <div className="text-xs text-zinc-400">Basculer l'affichage en plein écran</div>
+                            <div className="font-bold text-slate-200 text-lg">Mode Plein Écran</div>
+                            <div className="text-xs text-slate-400 font-sans">Basculer l'affichage en plein écran</div>
                         </div>
                         <button
                             onClick={toggleFullscreen}
-                            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 rounded text-xs font-semibold uppercase tracking-wider transition"
+                            className="px-4 py-2 bg-slate-900 hover:bg-cyan-950/60 border border-cyan-500/40 hover:border-cyan-400 rounded-lg text-xs font-bold uppercase tracking-wider text-cyan-300 transition cursor-pointer"
                         >
                             Basculer
                         </button>
                     </div>
 
-                    <div className="flex items-center justify-between py-2 border-b border-zinc-800/60">
+                    <div className="flex items-center justify-between py-2 border-b border-slate-800/80">
                         <div>
-                            <div className="font-semibold text-zinc-200">Langue</div>
-                            <div className="text-xs text-zinc-400">Langue de l'interface</div>
+                            <div className="font-bold text-slate-200 text-lg">Langue</div>
+                            <div className="text-xs text-slate-400 font-sans">Langue de l'interface</div>
                         </div>
-                        <span className="text-xs font-semibold px-3 py-1.5 bg-zinc-800 rounded border border-zinc-700">
+                        <span className="text-xs font-bold px-3 py-1.5 bg-slate-900 rounded-md border border-cyan-500/30 text-cyan-300">
                             Français (FR)
                         </span>
                     </div>
 
                     <div className="py-2">
-                        <div className="font-semibold text-zinc-200 mb-2">Contrôles clavier</div>
-                        <div className="grid grid-cols-2 gap-2 text-xs text-zinc-400">
-                            <div className="bg-zinc-800/60 p-2.5 rounded border border-zinc-800 flex justify-between">
-                                <span>Déplacement :</span>
-                                <strong className="text-zinc-200">Z, Q, S, D / Flèches</strong>
+                        <div className="font-bold text-slate-200 text-lg mb-2">Contrôles clavier</div>
+                        <div className="grid grid-cols-2 gap-2 text-xs font-sans">
+                            <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 flex justify-between">
+                                <span className="text-slate-400">Déplacement :</span>
+                                <strong className="text-cyan-300 font-bold">Z, Q, S, D / Flèches</strong>
                             </div>
-                            <div className="bg-zinc-800/60 p-2.5 rounded border border-zinc-800 flex justify-between">
-                                <span>Action / Tir :</span>
-                                <strong className="text-zinc-200">Espace</strong>
+                            <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 flex justify-between">
+                                <span className="text-slate-400">Action / Tir :</span>
+                                <strong className="text-cyan-300 font-bold">Espace / Clic Gauche</strong>
                             </div>
-                            <div className="bg-zinc-800/60 p-2.5 rounded border border-zinc-800 flex justify-between">
-                                <span>Menu / Pause :</span>
-                                <strong className="text-zinc-200">Échap</strong>
+                            <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 flex justify-between">
+                                <span className="text-slate-400">Glissade tactique :</span>
+                                <strong className="text-cyan-300 font-bold">C ou Ctrl</strong>
                             </div>
-                            <div className="bg-zinc-800/60 p-2.5 rounded border border-zinc-800 flex justify-between">
-                                <span>Valider :</span>
-                                <strong className="text-zinc-200">Entrée</strong>
+                            <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 flex justify-between">
+                                <span className="text-slate-400">Saut / Escalade :</span>
+                                <strong className="text-cyan-300 font-bold">Espace</strong>
                             </div>
                         </div>
                     </div>
@@ -79,7 +85,7 @@ export default function SettingsModal({ isOpen, onClose }) {
                 <div className="mt-8 text-right">
                     <button
                         onClick={onClose}
-                        className="px-5 py-2 bg-zinc-100 hover:bg-white text-zinc-900 font-semibold rounded text-sm transition"
+                        className="px-6 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-lg text-sm uppercase tracking-wider transition shadow-[0_0_15px_rgba(6,182,212,0.4)] cursor-pointer"
                     >
                         Retour au menu
                     </button>

@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+.font-orbitron {
+  font-family: 'Orbitron', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.font-rajdhani {
+  font-family: 'Rajdhani', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; transform: scale(0.98); }
   to { opacity: 1; transform: scale(1); }
@@ -7,4 +15,31 @@
 
 .animate-fadeIn {
   animation: fadeIn 0.15s ease-out forwards;
+}
+
+/* Texture de scanlines sci-fi */
+.hud-scanlines {
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(255, 255, 255, 0.02) 2px,
+    rgba(255, 255, 255, 0.02) 4px
+  );
+}
+
+/* Titre néon double lueur (cyan gauche, magenta droite) */
+.neon-title-dual {
+  text-shadow:
+    -3px 0 12px rgba(6, 182, 212, 0.9),
+    3px 0 12px rgba(217, 70, 239, 0.9),
+    0 0 24px rgba(168, 85, 247, 0.6),
+    0 4px 6px rgba(0, 0, 0, 0.9);
+}
+
+/* Lueur active cyan sur le bouton */
+.btn-glow-cyan {
+  box-shadow:
+    0 0 18px rgba(6, 182, 212, 0.7),
+    inset 0 0 12px rgba(6, 182, 212, 0.3);
 }
