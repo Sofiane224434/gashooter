@@ -499,31 +499,36 @@ export default function FirstPersonMap({ onExit, onQuitPage, initialMode = 'mult
             registerWall(turret);
         };
 
-        // Bâtiment militaire traversable (Porte 2.2m x 1.4m réglementaire)
+        // Bâtiment militaire traversable (Double porte avant et arrière pour circulation fluide)
         const addTacticalBuilding = (x, z, w, h, d, doorX = 0) => {
             const halfW = w / 2;
             const halfD = d / 2;
-            const doorW = 1.6;
-            const doorH = 2.4;
+            const doorW = 2.6;
+            const doorH = 3.0;
 
-            // Sol intérieur
+            // Sol intérieur praticable
             addSolidPlatform(x, 0, z, w - 0.4, 0.15, d - 0.4, concreteDarkMat);
 
             // Murs gauche et droit du bâtiment
             addSolidWall(x - halfW + 0.2, h / 2, z, 0.4, h, d, brickMat);
             addSolidWall(x + halfW - 0.2, h / 2, z, 0.4, h, d, brickMat);
 
-            // Mur arrière
-            addSolidWall(x, h / 2, z - halfD + 0.2, w, h, 0.4, brickMat);
+            // Mur arrière avec porte de sortie arrière
+            const backLeftPartW = Math.max(0.5, halfW - doorW / 2);
+            const backRightPartW = Math.max(0.5, halfW - doorW / 2);
+            addSolidWall(x - halfW + backLeftPartW / 2, h / 2, z - halfD + 0.2, backLeftPartW, h, 0.4, brickMat);
+            addSolidWall(x + halfW - backRightPartW / 2, h / 2, z - halfD + 0.2, backRightPartW, h, 0.4, brickMat);
+            const backLintelH = h - doorH;
+            addSolidWall(x, doorH + backLintelH / 2, z - halfD + 0.2, doorW, backLintelH, 0.4, concreteDarkMat);
 
-            // Mur avant avec ouverture de porte
+            // Mur avant avec ouverture de porte principale
             const leftPartW = Math.max(0.5, (halfW + doorX) - doorW / 2);
             const rightPartW = Math.max(0.5, (halfW - doorX) - doorW / 2);
 
             addSolidWall(x - halfW + leftPartW / 2, h / 2, z + halfD - 0.2, leftPartW, h, 0.4, brickMat);
             addSolidWall(x + halfW - rightPartW / 2, h / 2, z + halfD - 0.2, rightPartW, h, 0.4, brickMat);
 
-            // Linteau au-dessus de la porte
+            // Linteau au-dessus de la porte avant
             const lintelH = h - doorH;
             addSolidWall(x + doorX, doorH + lintelH / 2, z + halfD - 0.2, doorW, lintelH, 0.4, concreteDarkMat);
 
@@ -605,6 +610,53 @@ export default function FirstPersonMap({ onExit, onQuitPage, initialMode = 'mult
         // GÉNÉRATION DE LA CARTE 280x200m EN 3 ZONES STRATÉGIQUES (THREE LANES)
         // =========================================================================
 
+        // Façade de tunnel avec 3 larges portes d'accès (Lane Gauche 8m, Voie Centrale 18m, Lane Droite 8m)
+        const addTunnelPortalWithDoors = (zPos, isNorthEntrance = true) => {
+            const wallH = 7.5;
+            const doorClearH = 5.2; // Hauteur libre de passage de 5.2m
+            const lintelH = wallH - doorClearH; // 2.3m de linteau au-dessus
+            const lintelCenterY = doorClearH + lintelH / 2; // Y = 6.35m
+            const wallCenterY = wallH / 2; // Y = 3.75m
+
+            // 1. Mur Ouest extrême : X = -70 à -32 (largeur 38m, centre = -51m)
+            addSolidWall(-51.0, wallCenterY, zPos, 38.0, wallH, 1.5, concreteMat);
+
+            // 2. Porte Ouest (Lane Gauche) : X = -32 à -24 (largeur 8m ouverte)
+            // Linteau au-dessus de la porte Ouest
+            addSolidWall(-28.0, lintelCenterY, zPos, 8.0, lintelH, 1.5, concreteDarkMat);
+
+            // 3. Pilier intermédiaire Ouest : X = -24 à -9 (largeur 15m, centre = -16.5m)
+            addSolidWall(-16.5, wallCenterY, zPos, 15.0, wallH, 1.5, concreteMat);
+
+            // 4. Grand Portail Central : X = -9 à +9 (largeur 18m ouverte)
+            // Grand linteau au-dessus du portail central
+            addSolidWall(0, lintelCenterY, zPos, 18.0, lintelH, 1.5, concreteDarkMat);
+
+            // 5. Pilier intermédiaire Est : X = 9 à 24 (largeur 15m, centre = 16.5m)
+            addSolidWall(16.5, wallCenterY, zPos, 15.0, wallH, 1.5, concreteMat);
+
+            // 6. Porte Est (Lane Droite) : X = 24 à 32 (largeur 8m ouverte)
+            // Linteau au-dessus de la porte Est
+            addSolidWall(28.0, lintelCenterY, zPos, 8.0, lintelH, 1.5, concreteDarkMat);
+
+            // 7. Mur Est extrême : X = 32 à 70 (largeur 38m, centre = 51m)
+            addSolidWall(51.0, wallCenterY, zPos, 38.0, wallH, 1.5, concreteMat);
+
+            // Enseignes lumineuses tactiques au-dessus des 3 portes d'accès
+            const signMat = isNorthEntrance ? neonCyanMat : neonOrangeMat;
+            const centralSign = new THREE.Mesh(new THREE.BoxGeometry(10.0, 0.7, 0.3), signMat);
+            centralSign.position.set(0, 4.8, zPos + (isNorthEntrance ? 0.9 : -0.9));
+            scene.add(centralSign);
+
+            const westSign = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.5, 0.3), signMat);
+            westSign.position.set(-28.0, 4.6, zPos + (isNorthEntrance ? 0.9 : -0.9));
+            scene.add(westSign);
+
+            const eastSign = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.5, 0.3), signMat);
+            eastSign.position.set(28.0, 4.6, zPos + (isNorthEntrance ? 0.9 : -0.9));
+            scene.add(eastSign);
+        };
+
         // SOL PRINCIPAL PBR EN 3 BIOMES CONTINUS
         // Zone A (Parc Monceau) : Z = 30 à 100
         const groundParc = new THREE.Mesh(new THREE.PlaneGeometry(MAP_W, 70), grassMat);
@@ -665,8 +717,11 @@ export default function FirstPersonMap({ onExit, onQuitPage, initialMode = 'mult
         addSandbagBunker(-20, 50, Math.PI / 4);
         addSandbagBunker(20, 50, -Math.PI / 4);
 
-        // Grande Descente d'Escalier vers la station de métro (12m de large, Z = 34 à 30)
-        addTacticalStairs(0, 0, 34, 12.0, 2.4, 6.0, 10, -1);
+        // Allée de transition Zone A <-> Zone B (Parc vers Métro)
+        const transitionPathA = new THREE.Mesh(new THREE.PlaneGeometry(16.0, 10.0), tileFloorMat);
+        transitionPathA.rotation.x = -Math.PI / 2;
+        transitionPathA.position.set(0, 0.03, 30);
+        scene.add(transitionPathA);
 
         // -------------------------------------------------------------------------
         // ZONE B : STATION DE MÉTRO SOUTERRAINE (Z = -30 à 30)
@@ -678,16 +733,16 @@ export default function FirstPersonMap({ onExit, onQuitPage, initialMode = 'mult
         scene.add(tunnelRoof);
         registerWall(tunnelRoof);
 
-        // Murs de séparation du tunnel
-        addSolidWall(0, 3.5, 30, MAP_W, 7.0, 1.5, concreteMat);
-        addSolidWall(0, 3.5, -30, MAP_W, 7.0, 1.5, concreteMat);
+        // PORTES ET FAÇADES DU TUNNEL AVEC 3 PORTES OUVERTES DE CIRCULATION
+        addTunnelPortalWithDoors(30, true);   // Entrée Nord : Zone A <-> Zone B
+        addTunnelPortalWithDoors(-30, false); // Entrée Sud : Zone B <-> Zone C
 
-        // Quai central surélevé de 0.85m (Largeur 10m, Longueur 52m)
-        addSolidPlatform(0, 0, 0, 10.0, 0.85, 52.0, tileFloorMat);
+        // Quai central surélevé de 0.85m (Largeur 10m, Longueur 44m)
+        addSolidPlatform(0, 0, 0, 10.0, 0.85, 44.0, tileFloorMat);
 
-        // Rampes d'accès aux extrémités du quai
-        addTacticalStairs(0, 0, 28, 6.0, 0.85, 2.5, 4, -1);
-        addTacticalStairs(0, 0, -28, 6.0, 0.85, 2.5, 4, 1);
+        // Rampes d'accès faciles aux deux extrémités du quai (largeur 8m)
+        addTacticalStairs(0, 0, 22, 8.0, 0.85, 2.6, 4, -1);
+        addTacticalStairs(0, 0, -22, 8.0, 0.85, 2.6, 4, 1);
 
         // Voies ferrées gauche (X = -12) et droite (X = 12)
         for (let trackX of [-12, 12]) {
@@ -707,9 +762,9 @@ export default function FirstPersonMap({ onExit, onQuitPage, initialMode = 'mult
         addBattlefieldTrain(12, 0);
 
         // Piliers de soutènement massifs en béton (briseurs de lignes de vue tous les 10m)
-        for (let pz = -22; pz <= 22; pz += 11) {
-            const colLeft = addSolidWall(-4.0, 3.8, pz, 1.2, 7.6, 1.2, concreteDarkMat);
-            const colRight = addSolidWall(4.0, 3.8, pz, 1.2, 7.6, 1.2, concreteDarkMat);
+        for (let pz = -20; pz <= 20; pz += 10) {
+            const colLeft = addSolidWall(-4.5, 3.8, pz, 1.2, 7.6, 1.2, concreteDarkMat);
+            const colRight = addSolidWall(4.5, 3.8, pz, 1.2, 7.6, 1.2, concreteDarkMat);
 
             // Néons d'urgence à haute intensité
             const neonLamp = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.15, 0.15), neonCyanMat);
@@ -718,11 +773,14 @@ export default function FirstPersonMap({ onExit, onQuitPage, initialMode = 'mult
         }
 
         // Guichets & billetterie centrale (micro-couvertures à la sortie)
-        addJerseyBarrier(-3, -20, 0);
-        addJerseyBarrier(3, -20, 0);
+        addJerseyBarrier(-3, -18, 0);
+        addJerseyBarrier(3, -18, 0);
 
-        // Grande Montée d'Escalier vers le Boulevard (12m de large, Z = -30 à -34)
-        addTacticalStairs(0, 0, -30, 12.0, 2.4, 6.0, 10, -1);
+        // Allée de transition Zone B <-> Zone C (Métro vers Boulevard)
+        const transitionPathC = new THREE.Mesh(new THREE.PlaneGeometry(16.0, 10.0), tileFloorMat);
+        transitionPathC.rotation.x = -Math.PI / 2;
+        transitionPathC.position.set(0, 0.03, -30);
+        scene.add(transitionPathC);
 
         // -------------------------------------------------------------------------
         // ZONE C : BOULEVARD URBAIN & RUE COMMERCIALE (Z = -100 à -30)
