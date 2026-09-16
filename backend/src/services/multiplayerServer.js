@@ -26,24 +26,59 @@ export function setupMultiplayerServer(httpServer) {
     }
 
     function broadcastToRoom(room, message, excludeSocket = null) {
+        if (!room || !room.players) return;
         const payload = JSON.stringify(message);
         for (const player of room.players.values()) {
-            if (player.ws !== excludeSocket && player.ws.readyState === WebSocket.OPEN) {
-                player.ws.send(payload);
+            if (player.ws !== excludeSocket && player.ws && player.ws.readyState === WebSocket.OPEN) {
+                try {
+                    player.ws.send(payload);
+                } catch (err) {
+                    console.warn('[Multiplayer] Erreur broadcast:', err);
+                }
             }
         }
     }
 
+    // Gestion du protocole HTTP Upgrade pour WebSocket
     httpServer.on('upgrade', (request, socket, head) => {
-        const { pathname } = new URL(request.url, `http://${request.headers.host}`);
-        if (pathname === '/api/ws' || pathname === '/ws') {
-            wss.handleUpgrade(request, socket, head, (ws) => {
-                wss.emit('connection', ws, request);
-            });
+        try {
+            const host = request.headers.host || 'localhost';
+            const { pathname } = new URL(request.url, `http://${host}`);
+            if (pathname.startsWith('/api/ws') || pathname.startsWith('/ws')) {
+                wss.handleUpgrade(request, socket, head, (ws) => {
+                    wss.emit('connection', ws, request);
+                });
+            }
+        } catch (err) {
+            console.error('[Multiplayer] Erreur upgrade HTTP/WS:', err);
+            socket.destroy();
         }
     });
 
+    // Heartbeat Ping/Pong toutes les 25s pour garder la connexion active
+    const heartbeatInterval = setInterval(() => {
+        for (const ws of wss.clients) {
+            if (ws.isAlive === false) {
+                ws.terminate();
+                continue;
+            }
+            ws.isAlive = false;
+            try {
+                ws.ping();
+            } catch (e) {}
+        }
+    }, 25000);
+
+    wss.on('close', () => {
+        clearInterval(heartbeatInterval);
+    });
+
     wss.on('connection', (ws) => {
+        ws.isAlive = true;
+        ws.on('pong', () => {
+            ws.isAlive = true;
+        });
+
         let currentRoom = null;
         let currentPlayerId = null;
 
@@ -52,6 +87,11 @@ export function setupMultiplayerServer(httpServer) {
                 const data = JSON.parse(raw.toString());
 
                 switch (data.type) {
+                    case 'ping': {
+                        ws.send(JSON.stringify({ type: 'pong' }));
+                        break;
+                    }
+
                     case 'join': {
                         const roomId = data.roomId || 'global_arena';
                         currentRoom = getOrCreateRoom(roomId);
@@ -71,10 +111,10 @@ export function setupMultiplayerServer(httpServer) {
                             id: currentPlayerId,
                             name: data.playerName || `Combattant ${slotIndex + 1}`,
                             slotIndex,
-                            color: COLORS[slotIndex].hex,
-                            colorName: COLORS[slotIndex].name,
-                            spawnPos: COLORS[slotIndex].spawn,
-                            pos: COLORS[slotIndex].spawn,
+                            color: COLORS[slotIndex % 4].hex,
+                            colorName: COLORS[slotIndex % 4].name,
+                            spawnPos: COLORS[slotIndex % 4].spawn,
+                            pos: COLORS[slotIndex % 4].spawn,
                             rotY: 0,
                             pitch: 0,
                             isAiming: false,
@@ -164,7 +204,7 @@ export function setupMultiplayerServer(httpServer) {
                         const shooter = currentRoom.players.get(currentPlayerId);
 
                         if (target) {
-                            const damage = data.damage || 20;
+                            const damage = Math.min(100, Math.max(1, data.damage || 20));
                             target.hp = Math.max(0, target.hp - damage);
 
                             const isKill = target.hp <= 0;
@@ -223,6 +263,10 @@ export function setupMultiplayerServer(httpServer) {
                     rooms.delete(currentRoom.id);
                 }
             }
+        });
+
+        ws.on('error', (err) => {
+            console.warn('[Multiplayer] Erreur WS socket:', err.message);
         });
     });
 

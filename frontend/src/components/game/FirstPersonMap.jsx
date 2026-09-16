@@ -910,10 +910,11 @@ export default function FirstPersonMap({ onExit, onQuitPage, initialMode = 'mult
             }
         }, undefined, () => {});
 
-        // --- 5. MODÈLE DE JOUEUR ADVERSE ---
+        // --- 5. MODÈLE DE JOUEUR ADVERSE & HITBOXES ---
         const remotePlayersMap = new Map();
+        const playerHitboxesMap = new Map();
 
-        const createRealisticPlayerModel = (name, colorHex, spawnPos) => {
+        const createRealisticPlayerModel = (id, name, colorHex, spawnPos) => {
             const fighterGroup = new THREE.Group();
             fighterGroup.position.set(spawnPos[0], (spawnPos[1] || 1.7) - 1.7, spawnPos[2]);
 
@@ -1005,6 +1006,14 @@ export default function FirstPersonMap({ onExit, onQuitPage, initialMode = 'mult
 
             fighterGroup.add(headGroup);
 
+            // Hitbox dédiée et optimisée pour les tirs (Non récursive)
+            const hitboxMat = new THREE.MeshBasicMaterial({ visible: false, wireframe: false });
+            const hitboxMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 2.1, 8), hitboxMat);
+            hitboxMesh.position.set(0, 1.05, 0);
+            hitboxMesh.userData = { isPlayerHitbox: true, targetId: id, fighterGroup };
+            fighterGroup.add(hitboxMesh);
+            playerHitboxesMap.set(id, hitboxMesh);
+
             // Barre de Vie 3D Billboard
             const billboardGroup = new THREE.Group();
             billboardGroup.position.set(0, 2.55, 0);
@@ -1041,6 +1050,7 @@ export default function FirstPersonMap({ onExit, onQuitPage, initialMode = 'mult
             fighterGroup.add(billboardGroup);
 
             fighterGroup.userData = {
+                id,
                 name,
                 hp: 100,
                 maxHp: 100,
@@ -1050,6 +1060,7 @@ export default function FirstPersonMap({ onExit, onQuitPage, initialMode = 'mult
                 billboardGroup,
                 hpFill,
                 rMuzzleFlash,
+                hitboxMesh,
                 targetPos: new THREE.Vector3(spawnPos[0], (spawnPos[1] || 1.7) - 1.7, spawnPos[2]),
                 targetRotY: 0,
                 isAlive: true
@@ -1069,7 +1080,7 @@ export default function FirstPersonMap({ onExit, onQuitPage, initialMode = 'mult
             }
             data.players.forEach((p) => {
                 if (p.id !== data.myId && !remotePlayersMap.has(p.id)) {
-                    const model = createRealisticPlayerModel(p.name, p.color, p.pos || [0, 1.7, 0]);
+                    const model = createRealisticPlayerModel(p.id, p.name, p.color, p.pos || [0, 1.7, 0]);
                     remotePlayersMap.set(p.id, model);
                 }
             });
@@ -1078,7 +1089,7 @@ export default function FirstPersonMap({ onExit, onQuitPage, initialMode = 'mult
 
         mpClient.callbacks.onPlayerJoined = (p) => {
             if (!remotePlayersMap.has(p.id)) {
-                const model = createRealisticPlayerModel(p.name, p.color, p.pos || [0, 1.7, 0]);
+                const model = createRealisticPlayerModel(p.id, p.name, p.color, p.pos || [0, 1.7, 0]);
                 remotePlayersMap.set(p.id, model);
                 setConnectedPlayersCount((prev) => prev + 1);
                 setKillFeed((prev) => [`🎮 ${p.name} a rejoint`, ...prev.slice(0, 4)]);
@@ -1136,15 +1147,18 @@ export default function FirstPersonMap({ onExit, onQuitPage, initialMode = 'mult
                 const targetModel = remotePlayersMap.get(data.targetId);
                 if (targetModel) {
                     targetModel.userData.hp = data.newHp;
-                    const hpPercent = Math.max(0, data.newHp / 100);
-                    targetModel.userData.hpFill.scale.x = hpPercent;
-                    targetModel.userData.hpFill.position.x = -(1 - hpPercent) * 0.58;
+                    const hpPercent = THREE.MathUtils.clamp(data.newHp / 100, 0.001, 1.0);
+                    if (targetModel.userData.hpFill) {
+                        targetModel.userData.hpFill.scale.x = hpPercent;
+                        targetModel.userData.hpFill.position.x = -(1 - hpPercent) * 0.58;
 
-                    if (hpPercent > 0.5) targetModel.userData.hpFill.material.color.setHex(0x10b981);
-                    else if (hpPercent > 0.25) targetModel.userData.hpFill.material.color.setHex(0xf59e0b);
-                    else targetModel.userData.hpFill.material.color.setHex(0xef4444);
+                        if (hpPercent > 0.5) targetModel.userData.hpFill.material.color.setHex(0x10b981);
+                        else if (hpPercent > 0.25) targetModel.userData.hpFill.material.color.setHex(0xf59e0b);
+                        else targetModel.userData.hpFill.material.color.setHex(0xef4444);
+                    }
 
                     if (data.isKill) {
+                        targetModel.userData.isAlive = false;
                         targetModel.rotation.x = Math.PI / 2;
                         targetModel.position.y = 0.2;
                         setKillFeed((prev) => [`⚡ ${data.shooterName} a éliminé ${data.targetName}`, ...prev.slice(0, 4)]);
@@ -1165,10 +1179,13 @@ export default function FirstPersonMap({ onExit, onQuitPage, initialMode = 'mult
                 if (model) {
                     model.visible = true;
                     model.rotation.x = 0;
+                    model.userData.isAlive = true;
                     model.userData.hp = 100;
-                    model.userData.hpFill.scale.x = 1;
-                    model.userData.hpFill.position.x = 0;
-                    model.userData.hpFill.material.color.setHex(0x10b981);
+                    if (model.userData.hpFill) {
+                        model.userData.hpFill.scale.x = 1;
+                        model.userData.hpFill.position.x = 0;
+                        model.userData.hpFill.material.color.setHex(0x10b981);
+                    }
                     if (data.spawnPos) model.position.set(data.spawnPos[0], data.spawnPos[1] - 1.7, data.spawnPos[2]);
                 }
             }
@@ -1179,8 +1196,9 @@ export default function FirstPersonMap({ onExit, onQuitPage, initialMode = 'mult
             if (model) {
                 scene.remove(model);
                 remotePlayersMap.delete(id);
-                setConnectedPlayersCount((prev) => Math.max(1, prev - 1));
             }
+            playerHitboxesMap.delete(id);
+            setConnectedPlayersCount((prev) => Math.max(1, prev - 1));
         };
 
         mpClient.connect(`Joueur_${Math.floor(Math.random() * 900 + 100)}`, 'global_arena');
@@ -1350,12 +1368,12 @@ export default function FirstPersonMap({ onExit, onQuitPage, initialMode = 'mult
         const sparkMat = new THREE.MeshBasicMaterial({ color: 0xf97316 });
 
         const createSparks = (pos) => {
-            for (let i = 0; i < 14; i++) {
+            for (let i = 0; i < 6; i++) {
                 const spark = new THREE.Mesh(sparkGeo, sparkMat);
                 spark.position.copy(pos);
-                const vel = new THREE.Vector3((Math.random() - 0.5) * 8, Math.random() * 6 + 1, (Math.random() - 0.5) * 8);
+                const vel = new THREE.Vector3((Math.random() - 0.5) * 6, Math.random() * 4 + 1, (Math.random() - 0.5) * 6);
                 scene.add(spark);
-                sparks.push({ mesh: spark, vel, life: 0.7 });
+                sparks.push({ mesh: spark, vel, life: 0.35 });
             }
         };
 
@@ -1644,34 +1662,43 @@ export default function FirstPersonMap({ onExit, onQuitPage, initialMode = 'mult
         window.addEventListener('contextmenu', onContextMenu);
 
         // --- 12. DÉGÂTS PAR ZONE & BULLSEYE ---
+        let lastHitmarkerTime = 0;
         const handleTargetHit = (fighter, hitPoint, targetId, isSniper) => {
-            sound.playHitmarker();
+            const now = performance.now();
+            if (now - lastHitmarkerTime > 60) {
+                sound.playHitmarker();
+                lastHitmarkerTime = now;
+            }
             setShotsHit((prev) => prev + 1);
 
             const headWorldPos = new THREE.Vector3();
-            fighter.userData.headGroup.getWorldPosition(headWorldPos);
+            if (fighter.userData.headGroup) {
+                fighter.userData.headGroup.getWorldPosition(headWorldPos);
+            } else {
+                headWorldPos.set(fighter.position.x, fighter.position.y + 1.85, fighter.position.z);
+            }
             const distToHeadCenter = hitPoint.distanceTo(headWorldPos);
 
             let damage = isSniper ? 65 : 20;
             let hitType = isSniper ? 'SNIPER (65 DMG)' : 'CORPS (20 DMG)';
             let isHeadshot = false;
 
-            if (distToHeadCenter <= 0.45) {
+            if (distToHeadCenter <= 0.45 || hitPoint.y >= fighter.position.y + 1.5) {
                 isHeadshot = true;
-                if (distToHeadCenter <= 0.10) {
+                if (distToHeadCenter <= 0.12) {
                     damage = 100;
                     hitType = isSniper ? '🎯 ONE-SHOT HEADSHOT !' : '🎯 BULLSEYE HEADSHOT !';
-                } else if (distToHeadCenter <= 0.24) {
+                } else if (distToHeadCenter <= 0.26) {
                     damage = isSniper ? 100 : 65;
                     hitType = '🔴 ANNEAU ROUGE';
-                } else if (distToHeadCenter <= 0.36) {
+                } else if (distToHeadCenter <= 0.38) {
                     damage = isSniper ? 85 : 40;
                     hitType = '🔵 ANNEAU BLEU';
                 } else {
                     damage = isSniper ? 75 : 25;
-                    hitType = '⚪ CIBLE';
+                    hitType = '⚪ CIBLE CRÂNE';
                 }
-            } else if (hitPoint.y < headWorldPos.y - 0.9) {
+            } else if (hitPoint.y < fighter.position.y + 0.8) {
                 damage = isSniper ? 50 : 15;
                 hitType = isSniper ? 'JAMBE (50 DMG)' : 'JAMBE (15 DMG)';
             }
@@ -1759,10 +1786,21 @@ export default function FirstPersonMap({ onExit, onQuitPage, initialMode = 'mult
             }
 
             for (const [id, f] of remotePlayersMap.entries()) {
-                f.position.lerp(f.userData.targetPos, delta * 12);
-                f.rotation.y = THREE.MathUtils.lerp(f.rotation.y, f.userData.targetRotY, delta * 12);
-                f.userData.headGroup.lookAt(camera.position.x, f.position.y + 1.85, camera.position.z);
-                f.userData.billboardGroup.quaternion.copy(camera.quaternion);
+                f.position.lerp(f.userData.targetPos, Math.min(1.0, delta * 14));
+                f.rotation.y = THREE.MathUtils.lerp(f.rotation.y, f.userData.targetRotY, Math.min(1.0, delta * 14));
+                
+                // Rotation de tête sûre sans LookAt corrompu
+                const dx = camera.position.x - f.position.x;
+                const dz = camera.position.z - f.position.z;
+                if (dx * dx + dz * dz > 0.01 && f.userData.headGroup) {
+                    const worldAngle = Math.atan2(dx, dz);
+                    let headRelYaw = worldAngle - f.rotation.y;
+                    headRelYaw = Math.atan2(Math.sin(headRelYaw), Math.cos(headRelYaw));
+                    f.userData.headGroup.rotation.y = THREE.MathUtils.clamp(headRelYaw, -Math.PI * 0.45, Math.PI * 0.45);
+                }
+                if (f.userData.billboardGroup) {
+                    f.userData.billboardGroup.rotation.y = -f.rotation.y + camera.rotation.y;
+                }
             }
 
             // Caisses de munitions
@@ -1807,31 +1845,24 @@ export default function FirstPersonMap({ onExit, onQuitPage, initialMode = 'mult
                 bulletRay.near = 0;
                 bulletRay.far = stepDist + 0.5;
 
-                // Optimisation performance multi : cibler uniquement les colliders et les joueurs distants
-                const bulletTargets = [...colliderMeshes, ...Array.from(remotePlayersMap.values())];
-                const intersects = bulletRay.intersectObjects(bulletTargets, true);
+                // Optimisation performance multi : cibler uniquement les colliders solides et les hitboxes des joueurs distants (non récursif)
+                const activeHitboxes = Array.from(playerHitboxesMap.values());
+                const bulletTargets = activeHitboxes.length > 0 ? [...colliderMeshes, ...activeHitboxes] : colliderMeshes;
+                const intersects = bulletRay.intersectObjects(bulletTargets, false);
 
                 let collided = false;
                 if (intersects.length > 0) {
-                    for (const hit of intersects) {
-                        if (hit.object === b.mesh || hit.object.parent === weaponPivot || hit.object.parent === arMeshGroup || hit.object.parent === sniperMeshGroup) continue;
-
+                    const hit = intersects[0];
+                    if (hit.object !== b.mesh && hit.object.parent !== weaponPivot && hit.object.parent !== arMeshGroup && hit.object.parent !== sniperMeshGroup) {
                         collided = true;
                         createSparks(hit.point);
 
-                        if (b.fromPlayer) {
-                            for (const [targetId, f] of remotePlayersMap.entries()) {
-                                let obj = hit.object;
-                                while (obj && obj !== scene) {
-                                    if (obj === f) {
-                                        handleTargetHit(f, hit.point, targetId, b.isSniper);
-                                        break;
-                                    }
-                                    obj = obj.parent;
-                                }
+                        if (b.fromPlayer && hit.object.userData && hit.object.userData.isPlayerHitbox) {
+                            const { targetId, fighterGroup } = hit.object.userData;
+                            if (fighterGroup && fighterGroup.userData.isAlive) {
+                                handleTargetHit(fighterGroup, hit.point, targetId, b.isSniper);
                             }
                         }
-                        break;
                     }
                 }
 

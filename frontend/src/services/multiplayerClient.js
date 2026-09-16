@@ -6,6 +6,7 @@ export class MultiplayerClient {
         this.myId = null;
         this.mySlot = 0;
         this.myColor = 0x06b6d4;
+        this.pingInterval = null;
         this.callbacks = {
             onInitState: null,
             onPlayerJoined: null,
@@ -34,6 +35,16 @@ export class MultiplayerClient {
                     playerName,
                     roomId
                 }));
+
+                // Heartbeat régulier toutes les 15 secondes pour éviter tout timeout proxy/nginx
+                if (this.pingInterval) clearInterval(this.pingInterval);
+                this.pingInterval = setInterval(() => {
+                    if (this.connected && this.ws?.readyState === 1) {
+                        try {
+                            this.ws.send(JSON.stringify({ type: 'ping' }));
+                        } catch (e) {}
+                    }
+                }, 15000);
             };
 
             this.ws.onmessage = (event) => {
@@ -41,6 +52,9 @@ export class MultiplayerClient {
                     const data = JSON.parse(event.data);
 
                     switch (data.type) {
+                        case 'pong':
+                            break;
+
                         case 'init_state':
                             this.myId = data.myId;
                             this.mySlot = data.mySlot;
@@ -83,6 +97,7 @@ export class MultiplayerClient {
 
             this.ws.onclose = () => {
                 this.connected = false;
+                if (this.pingInterval) clearInterval(this.pingInterval);
                 if (this.callbacks.onDisconnected) this.callbacks.onDisconnected();
             };
 
@@ -95,50 +110,61 @@ export class MultiplayerClient {
     }
 
     sendMove(pos, rotY, pitch = 0, isAiming = false) {
-        if (this.connected && this.ws?.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify({
-                type: 'move',
-                pos: [pos.x, pos.y, pos.z],
-                rotY,
-                pitch,
-                isAiming
-            }));
+        if (this.connected && this.ws?.readyState === 1) {
+            try {
+                this.ws.send(JSON.stringify({
+                    type: 'move',
+                    pos: [pos.x, pos.y, pos.z],
+                    rotY,
+                    pitch,
+                    isAiming
+                }));
+            } catch (e) {}
         }
     }
 
     sendShoot(origin, dir) {
-        if (this.connected && this.ws?.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify({
-                type: 'shoot',
-                origin: [origin.x, origin.y, origin.z],
-                dir: [dir.x, dir.y, dir.z]
-            }));
+        if (this.connected && this.ws?.readyState === 1) {
+            try {
+                this.ws.send(JSON.stringify({
+                    type: 'shoot',
+                    origin: [origin.x, origin.y, origin.z],
+                    dir: [dir.x, dir.y, dir.z]
+                }));
+            } catch (e) {}
         }
     }
 
     sendHit(targetId, damage, hitType, hitPoint) {
-        if (this.connected && this.ws?.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify({
-                type: 'hit',
-                targetId,
-                damage,
-                hitType,
-                hitPoint: [hitPoint.x, hitPoint.y, hitPoint.z]
-            }));
+        if (this.connected && this.ws?.readyState === 1) {
+            try {
+                this.ws.send(JSON.stringify({
+                    type: 'hit',
+                    targetId,
+                    damage,
+                    hitType,
+                    hitPoint: [hitPoint.x, hitPoint.y, hitPoint.z]
+                }));
+            } catch (e) {}
         }
     }
 
     sendRespawn() {
-        if (this.connected && this.ws?.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify({
-                type: 'respawn'
-            }));
+        if (this.connected && this.ws?.readyState === 1) {
+            try {
+                this.ws.send(JSON.stringify({
+                    type: 'respawn'
+                }));
+            } catch (e) {}
         }
     }
 
     disconnect() {
+        if (this.pingInterval) clearInterval(this.pingInterval);
         if (this.ws) {
-            this.ws.close();
+            try {
+                this.ws.close();
+            } catch (e) {}
             this.ws = null;
             this.connected = false;
         }
